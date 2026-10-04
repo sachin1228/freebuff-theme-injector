@@ -23,10 +23,19 @@
   var UI_ID = 'fbs-theme-ui'
   var NS = 'fbs'
 
-  /* Inter and Geist are pulled from Google Fonts on demand — nothing is
-     installed on disk, and the fallback stack keeps the UI intact offline. */
+  /* Freebuff's own font stack, captured from the app's :root declaration.
+     The "Freebuff default" font option forces it back on — themes may claim
+     --font-sans, so restoring it needs an explicit value. Inter and Geist are
+     pulled from Google Fonts on demand — nothing is installed on disk, and
+     the fallback stack keeps the UI intact offline. */
   var FONTS = [
     { id: '', name: 'System default', family: null, href: null },
+    {
+      id: 'freebuff',
+      name: 'Freebuff default',
+      family: '"Google Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif',
+      href: null,
+    },
     {
       id: 'inter',
       name: 'Inter',
@@ -297,10 +306,14 @@
     if (!keepNote) state().fontNote = ''
     var el = fontStyleEl()
     if (f.family) {
-      fontLink(f)
+      // A single family gets quoted and stacked on the fallback; a full
+      // stack (comma inside) is Freebuff's own — insert it raw.
+      if (f.href) fontLink(f)
+      var value =
+        f.family.indexOf(',') !== -1 ? f.family : "'" + f.family + "', " + FONT_FALLBACK
       el.textContent =
         ':root, :root[data-theme], :root[data-theme=dark], :root[data-theme=light] {' +
-        "--font-sans: '" + f.family + "', " + FONT_FALLBACK + ' !important; }'
+        '--font-sans: ' + value + ' !important; }'
     } else {
       el.textContent = ''
     }
@@ -319,24 +332,24 @@
       '.fbs-theme-btn{cursor:pointer}',
       '.fbs-theme-btn:hover{color:var(--text)}',
       '.fbs-theme-btn.fbs-on{color:var(--text);background:color-mix(in srgb,var(--text) 14%,transparent)}',
-      '.fbs-panel{position:fixed;z-index:2147483000;width:300px;max-height:460px;box-sizing:border-box;',
+      '.fbs-panel{position:fixed;z-index:2147483000;width:300px;max-height:520px;box-sizing:border-box;',
       ' display:flex;flex-direction:column;overflow:hidden;',
       ' border:1px solid var(--border);border-radius:var(--radius-popup,18px);',
       ' background:var(--popover,var(--surface));color:var(--text);',
-      ' box-shadow:0 18px 60px rgb(0 0 0 / 35%);padding:14px;font-family:var(--font-sans,system-ui);',
+      ' box-shadow:0 18px 60px rgb(0 0 0 / 35%);padding:12px;font-family:var(--font-sans,system-ui);',
       ' -webkit-app-region:no-drag}',
       // Theme rows scroll; the font control stays pinned at the bottom.
       '.fbs-list{flex:1 1 auto;min-height:0;overflow:auto}',
-      '.fbs-foot{flex:0 0 auto;margin-top:10px;padding-top:12px;border-top:1px solid var(--border)}',
+      '.fbs-foot{flex:0 0 auto;margin-top:8px;padding-top:10px;border-top:1px solid var(--border)}',
       '.fbs-panel h3{margin:0 0 2px;font-size:var(--font-size-title,15px);font-weight:var(--font-weight-semibold,600)}',
-      '.fbs-panel .fbs-sub{margin:0 0 10px;font-size:var(--font-size-ui,12px);color:var(--muted)}',
-      '.fbs-row{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;padding:8px 10px;',
-      ' margin-bottom:6px;border:1px solid var(--border);border-radius:var(--radius-md,8px);background:transparent;',
+      '.fbs-panel .fbs-sub{margin:0 0 8px;font-size:var(--font-size-ui,12px);color:var(--muted)}',
+      '.fbs-row{display:flex;align-items:center;gap:9px;width:100%;box-sizing:border-box;padding:4px 9px;',
+      ' margin-bottom:3px;border:1px solid var(--border);border-radius:var(--radius-md,8px);background:transparent;',
       ' color:var(--text);font:inherit;font-size:var(--font-size-body,13px);text-align:left;cursor:pointer}',
       '.fbs-row:hover{background:var(--control-bg-hover,rgb(255 255 255 / 5%))}',
       '.fbs-row.fbs-sel{border-color:var(--brand);background:var(--selected)}',
       '.fbs-sw{display:flex;flex:0 0 auto}',
-      '.fbs-sw i{width:12px;height:12px;border-radius:50%;margin-left:-4px;border:1.5px solid var(--popover,var(--surface))}',
+      '.fbs-sw i{width:10px;height:10px;border-radius:50%;margin-left:-3.5px;border:1.5px solid var(--popover,var(--surface))}',
       '.fbs-sw i:first-child{margin-left:0}',
       '.fbs-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '.fbs-check{flex:0 0 auto;color:var(--brand);font-weight:700;visibility:hidden}',
@@ -346,7 +359,7 @@
       // Native select, restyled: appearance:none + an inline chevron so the
       // control follows theme tokens instead of the OS accent.
       '.fbs-select{appearance:none;-webkit-appearance:none;box-sizing:border-box;min-width:140px;',
-      ' padding:7px 28px 7px 10px;border:1px solid var(--border);border-radius:var(--radius-md,8px);',
+      ' padding:6px 26px 6px 9px;border:1px solid var(--border);border-radius:var(--radius-md,8px);',
       ' background-color:var(--control-bg,var(--surface-2));color:var(--text);font:inherit;',
       ' font-size:var(--font-size-body,13px);cursor:pointer;',
       " background-image:url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3e%3cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.6' stroke-linecap='round'/%3e%3c/svg%3e\");",
@@ -572,7 +585,7 @@
   // Bump when the picker markup or behaviour changes: an older closure that
   // already owns the chrome keeps serving its own (stale) panel after a live
   // push, so a version mismatch has to take the UI over instead of delegating.
-  var VERSION = '4'
+  var VERSION = '6'
 
   // Capture any installer from a previous injection *before* redefining.
   var prevInstall = typeof window.__FBS_INSTALL__ === 'function' ? window.__FBS_INSTALL__ : null
@@ -598,7 +611,40 @@
     s.attached = false
   }
 
+  /* The generated session preload paints with an adopted stylesheet before any
+     page script runs (first-paint flash guard). Constructable sheets beat
+     document <style> elements in the cascade, so once the runtime is alive the
+     preload's copy would shadow every later change made in-session. The
+     preload is bootstrap only: drop it the moment the runtime (re)applies
+     stored settings — from then on the live style elements are the single
+     source of truth. Non-preload sheets (none today) are left alone; the
+     generated preload is identified by its --fbs- token block. */
+  function dropPreloadSheets() {
+    try {
+      var adopted = document.adoptedStyleSheets
+      if (!adopted || !adopted.length) return
+      var keep = []
+      for (var i = 0; i < adopted.length; i++) {
+        var isPreload = false
+        try {
+          var rules = adopted[i].cssRules
+          for (var j = 0; j < rules.length; j++) {
+            if (String(rules[j].cssText || '').indexOf('--fbs-') !== -1) {
+              isPreload = true
+              break
+            }
+          }
+        } catch (e) {
+          isPreload = false
+        }
+        if (!isPreload) keep.push(adopted[i])
+      }
+      if (keep.length !== adopted.length) document.adoptedStyleSheets = keep
+    } catch {}
+  }
+
   function applyStored() {
+    dropPreloadSheets()
     var active = storedActive()
     if (active && !findTheme(active)) {
       // theme was deleted — fall back to default

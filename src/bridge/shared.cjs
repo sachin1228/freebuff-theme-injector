@@ -79,10 +79,18 @@ const BRIDGE_CSS = [
   '}',
 ].join('\n')
 
-/* Inter and Geist are pulled from Google Fonts on demand — nothing is
-   installed on disk, and the fallback stack keeps the UI intact offline. */
+/* Freebuff's own font stack, captured from the app's :root declaration (the
+   "Freebuff default" font option). Inter and Geist are pulled from Google
+   Fonts on demand — nothing is installed on disk, and the fallback stack
+   keeps the UI intact offline. Mirrors runtime.js — keep in sync. */
 const FONTS = [
   { id: '', name: 'System default', family: null, href: null },
+  {
+    id: 'freebuff',
+    name: 'Freebuff default',
+    family: '"Google Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif',
+    href: null,
+  },
   {
     id: 'inter',
     name: 'Inter',
@@ -181,9 +189,12 @@ function buildEarlyCss(theme, fontId) {
   const f = findFont(fontId)
   let css = theme.css + '\n' + BRIDGE_CSS + '\n' + splashTintCss(theme) + '\n'
   if (f.family) {
+    // A single family gets quoted and stacked on the fallback; a full stack
+    // (comma inside) is Freebuff's own — insert it raw. Mirrors runtime.js.
+    const value = f.family.indexOf(',') !== -1 ? f.family : "'" + f.family + "', " + FONT_FALLBACK
     css +=
       ':root, :root[data-theme], :root[data-theme=dark], :root[data-theme=light] {' +
-      "--font-sans: '" + f.family + "', " + FONT_FALLBACK + ' !important; }\n'
+      '--font-sans: ' + value + ' !important; }\n'
   }
   return css
 }

@@ -356,19 +356,27 @@
       '.fbs-row.fbs-sel .fbs-check{visibility:visible}',
       '.fbs-field{display:flex;align-items:center;justify-content:space-between;gap:10px}',
       '.fbs-field-label{font-size:var(--font-size-ui,12px);color:var(--muted)}',
-      // Native select, restyled: appearance:none + an inline chevron so the
-      // control follows theme tokens instead of the OS accent.
+      // Native select, restyled: appearance:none plus an inline chevron
+      // element (see CHEVRON_SVG) so the control follows theme tokens instead
+      // of the OS accent and stays visible on light and dark themes alike.
+      '.fbs-select-wrap{position:relative;display:inline-flex;align-items:center}',
+      '.fbs-chev{position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--muted)}',
       '.fbs-select{appearance:none;-webkit-appearance:none;box-sizing:border-box;min-width:140px;',
       ' padding:6px 26px 6px 9px;border:1px solid var(--border);border-radius:var(--radius-md,8px);',
       ' background-color:var(--control-bg,var(--surface-2));color:var(--text);font:inherit;',
-      ' font-size:var(--font-size-body,13px);cursor:pointer;',
-      " background-image:url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3e%3cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.6' stroke-linecap='round'/%3e%3c/svg%3e\");",
-      ' background-repeat:no-repeat;background-position:right 9px center}',
+      ' font-size:var(--font-size-body,13px);cursor:pointer}',
       '.fbs-select:hover{background-color:var(--control-bg-hover,var(--raised))}',
       '.fbs-select:focus-visible{outline:none;border-color:var(--brand)}',
       '.fbs-note{display:block;margin-top:7px;font-size:var(--font-size-caption,11px);color:var(--warning-text,var(--muted))}',
     ].join('')
   }
+
+  // The select's dropdown affordance: an inline SVG (not a background image)
+  // so it inherits the panel's text colour and stays visible on every theme.
+  var CHEVRON_SVG =
+    '<svg class="fbs-chev" width="12" height="7" viewBox="0 0 12 7" fill="none" ' +
+    'stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" ' +
+    'aria-hidden="true"><path d="M1 1l5 5 5-5"/></svg>'
 
   var PALETTE_SVG =
     '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
@@ -407,14 +415,24 @@
 
   function fontFieldHtml() {
     var cur = storedFont()
-    var opts = FONTS.map(function (f) {
-      return '<option value="' + f.id + '"' + (f.id === cur ? ' selected' : '') + '>' + textSafe(f.name) + '</option>'
-    }).join('')
+    // "System default" (the id-less no-override entry) is deliberately not a
+    // choice: Freebuff's own stack already falls through to the system font,
+    // so the picker starts at "Freebuff default". An unset stored font marks
+    // no option, and the browser shows the first one — which is what renders.
+    var opts = ''
+    for (var i = 0; i < FONTS.length; i++) {
+      var f = FONTS[i]
+      if (!f.id) continue
+      opts +=
+        '<option value="' + f.id + '"' + (f.id === cur ? ' selected' : '') + '>' + textSafe(f.name) + '</option>'
+    }
     var html =
       '<div class="fbs-field"><span class="fbs-field-label">Font</span>' +
-      '<select class="fbs-select" data-fbs-font aria-label="Font">' +
+      '<span class="fbs-select-wrap"><select class="fbs-select" data-fbs-font aria-label="Font">' +
       opts +
-      '</select></div>'
+      '</select>' +
+      CHEVRON_SVG +
+      '</span></div>'
     if (state().fontNote) html += '<span class="fbs-note">' + textSafe(state().fontNote) + '</span>'
     return html
   }
@@ -585,7 +603,7 @@
   // Bump when the picker markup or behaviour changes: an older closure that
   // already owns the chrome keeps serving its own (stale) panel after a live
   // push, so a version mismatch has to take the UI over instead of delegating.
-  var VERSION = '6'
+  var VERSION = '7'
 
   // Capture any installer from a previous injection *before* redefining.
   var prevInstall = typeof window.__FBS_INSTALL__ === 'function' ? window.__FBS_INSTALL__ : null

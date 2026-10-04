@@ -356,7 +356,17 @@ if (IS_ELECTRON && IS_BROWSER_PROCESS && !globalThis.__FBS_BOOT__) {
             const p = splashPalette()
             if (p && isSplashUrl(url)) this.setBackgroundColor(p.bg)
           } catch {}
-          return orig.apply(this, args)
+          const res = orig.apply(this, args)
+          // A window destroyed mid-load (e.g. during quit) rejects with
+          // "Object has been destroyed" — meaningless once the frame is gone.
+          // Swallow only that error; anything else must reach Freebuff as-is.
+          if (res && typeof res.catch === 'function') {
+            return res.catch((err) => {
+              if (err && /destroyed/i.test(String(err && err.message))) return undefined
+              throw err
+            })
+          }
+          return res
         }
       } catch {}
     }

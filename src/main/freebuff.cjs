@@ -61,14 +61,25 @@ function exec(cmd, args) {
   })
 }
 
-/** Is a Freebuff main process running? (any instance) */
-async function isFreebuffRunning() {
+/** PIDs of running Freebuff main processes (any instance). */
+async function freebuffPids() {
   if (process.platform === 'win32') {
-    const out = await exec('tasklist', ['/FI', 'IMAGENAME eq Freebuff.exe', '/NH'])
-    return /Freebuff\.exe/i.test(out)
+    const out = await exec('tasklist', ['/FI', 'IMAGENAME eq Freebuff.exe', '/NH', '/FO', 'CSV'])
+    return out
+      .split('\n')
+      .map((line) => {
+        const m = /"Freebuff\.exe","(\d+)"/i.exec(line)
+        return m ? Number(m[1]) : null
+      })
+      .filter(Boolean)
   }
   const out = await exec('pgrep', ['-x', 'Freebuff'])
-  return out.trim().length > 0
+  return out.trim().split('\n').filter(Boolean).map(Number)
+}
+
+/** Is a Freebuff main process running? (any instance) */
+async function isFreebuffRunning() {
+  return (await freebuffPids()).length > 0
 }
 
 async function quitFreebuff() {
@@ -135,4 +146,4 @@ function launchPlain(exePath) {
   child.unref()
 }
 
-module.exports = { detectFreebuff, isFreebuffRunning, quitFreebuff, launchFreebuff, launchPlain, INSPECT_PORT }
+module.exports = { detectFreebuff, isFreebuffRunning, freebuffPids, quitFreebuff, launchFreebuff, launchPlain, INSPECT_PORT }

@@ -1,0 +1,13 @@
+{
+  "id": "vercel",
+  "name": "Vercel",
+  "mode": "dark",
+  "swatches": [
+    "#0a0a0a",
+    "#141414",
+    "#ffffff",
+    "#e3e3e6"
+  ],
+  "version": 1,
+  "author": "TerminalHub import"
+}

@@ -1,0 +1,63 @@
+/* TerminalHub Graphite — ported from TerminalHub's brand theme ramp */
+:root,
+:root[data-theme],
+:root[data-theme=dark] {
+  color-scheme: dark !important;
+  --shell-base: #0a0b0c !important;
+  --workspace-surface: #101113 !important;
+  --bg: var(--workspace-surface) !important;
+  --chrome: var(--shell-base) !important;
+  --surface: #141416 !important;
+  --surface-2: #1d1d20 !important;
+  --raised: #212227 !important;
+  --border: #29292d !important;
+  --text: #e8e8ea !important;
+  --muted: #98989f !important;
+  --faint: #6e6e76 !important;
+  --accent: #e8e8ea !important;
+  --accent-dim: #6e6e76 !important;
+  --brand-1: #d18226 !important;
+  --brand-2: #ff9f2e !important;
+  --brand-3: #ffca8c !important;
+  --brand: var(--brand-2) !important;
+  --brand-ink: #ff9f2e !important;
+  --brand-dim: #d18226 !important;
+  --primary-action: var(--brand) !important;
+  --primary-action-text: #0d0e0f !important;
+  --green: #ff9f2e !important;
+  --ok: #ff9f2e !important;
+  --success-text: #ff9f2e !important;
+  --premium: #e6b455 !important;
+  --danger: #ff5252 !important;
+  --danger-text: #ff7b7b !important;
+  --warn: #e6a23c !important;
+  --warning-text: #e6b455 !important;
+  --info: #62b5ff !important;
+  --conflict: #e6a23c !important;
+  --merged: #c48aff !important;
+  --bubble: #1d1d20 !important;
+  --popover: #1d1d20 !important;
+  --input: #1d1d20 !important;
+  --placeholder: #6e6e76 !important;
+  --field-focus: #d18226 !important;
+  --selected: #212227 !important;
+  --tab-track: #141416 !important;
+  --tab-active-surface: #1d1d20 !important;
+  --tab-indicator: #34353c !important;
+  --tab-selected-text: #e8e8ea !important;
+  --message-fill: var(--tab-indicator) !important;
+  --message-ink: var(--tab-selected-text) !important;
+  --matte-edge: rgb(255 255 255 / 7%) !important;
+  --control-border: var(--matte-edge) !important;
+  --control-border-hover: #3a3a42 !important;
+  --control-bg: var(--surface-2) !important;
+  --scrim: rgb(0 0 0 / 50%) !important;
+  --logo-filter: brightness(.92) !important;
+  --syntax-comment: #6e6e76 !important;
+  --syntax-keyword: #ff9f2e !important;
+  --syntax-string: #7fd8a4 !important;
+  --syntax-number: #e6b455 !important;
+  --syntax-function: #62b5ff !important;
+  --syntax-type: #e6c56a !important;
+  --syntax-property: #6fd8d0 !important;
+}

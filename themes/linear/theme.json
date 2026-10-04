@@ -1,0 +1,13 @@
+{
+  "id": "linear",
+  "name": "Linear",
+  "mode": "dark",
+  "swatches": [
+    "#0f1012",
+    "#1b1d20",
+    "#5e6ad2",
+    "#f7f8f9"
+  ],
+  "version": 1,
+  "author": "TerminalHub import"
+}

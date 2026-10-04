@@ -1,0 +1,13 @@
+{
+  "id": "github",
+  "name": "GitHub",
+  "mode": "dark",
+  "swatches": [
+    "#0d1117",
+    "#161b22",
+    "#238636",
+    "#e6edf3"
+  ],
+  "version": 1,
+  "author": "TerminalHub import"
+}

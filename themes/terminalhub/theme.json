@@ -1,0 +1,13 @@
+{
+  "id": "terminalhub",
+  "name": "TerminalHub Graphite",
+  "mode": "dark",
+  "swatches": [
+    "#101113",
+    "#1d1d20",
+    "#ff9f2e",
+    "#e8e8ea"
+  ],
+  "version": 1,
+  "author": "TerminalHub import"
+}

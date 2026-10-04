@@ -1,0 +1,67 @@
+/* Uber — ported from TerminalHub's brand theme ramp */
+:root,
+:root[data-theme],
+:root[data-theme=dark] {
+  color-scheme: dark !important;
+  --shell-base: #000000 !important;
+  --workspace-surface: #0b0b0c !important;
+  --bg: var(--workspace-surface) !important;
+  --chrome: var(--shell-base) !important;
+  --surface: #0f0f11 !important;
+  --surface-2: #16161a !important;
+  --raised: #1f1f24 !important;
+  --border: #25252b !important;
+  --text: #ffffff !important;
+  --muted: #a2a2ab !important;
+  --faint: #6e6e78 !important;
+  --accent: #ffffff !important;
+  --accent-dim: #6e6e78 !important;
+  --brand-1: #e3e3e6 !important;
+  --brand-2: #ffffff !important;
+  --brand-3: #ffffff !important;
+  --brand: var(--brand-2) !important;
+  --brand-ink: #ffffff !important;
+  --brand-dim: #e3e3e6 !important;
+  --primary-action: var(--brand) !important;
+  --primary-action-text: #101014 !important;
+  /* White-on-white switches: the "on" track is the brand, so the
+     knob has to invert to the theme's ink to stay readable. */
+  --switch-track-on: #ffffff !important;
+  --switch-thumb-on: #101014 !important;
+  --green: #f2f2f4 !important;
+  --ok: #f2f2f4 !important;
+  --success-text: #f2f2f4 !important;
+  --premium: #e6b455 !important;
+  --danger: #ff5252 !important;
+  --danger-text: #ff7b7b !important;
+  --warn: #e6a23c !important;
+  --warning-text: #e6b455 !important;
+  --info: #62b5ff !important;
+  --conflict: #e6a23c !important;
+  --merged: #c48aff !important;
+  --bubble: #16161a !important;
+  --popover: #16161a !important;
+  --input: #16161a !important;
+  --placeholder: #6e6e78 !important;
+  --field-focus: #e8e8ea !important;
+  --selected: #1f1f24 !important;
+  --tab-track: #0f0f11 !important;
+  --tab-active-surface: #16161a !important;
+  --tab-indicator: #2a2a30 !important;
+  --tab-selected-text: #ffffff !important;
+  --message-fill: var(--tab-indicator) !important;
+  --message-ink: var(--tab-selected-text) !important;
+  --matte-edge: rgb(255 255 255 / 7%) !important;
+  --control-border: var(--matte-edge) !important;
+  --control-border-hover: #37373f !important;
+  --control-bg: var(--surface-2) !important;
+  --scrim: rgb(0 0 0 / 50%) !important;
+  --logo-filter: brightness(.92) !important;
+  --syntax-comment: #6e6e78 !important;
+  --syntax-keyword: #06c167 !important;
+  --syntax-string: #7fd8a4 !important;
+  --syntax-number: #e6b455 !important;
+  --syntax-function: #62b5ff !important;
+  --syntax-type: #e6c56a !important;
+  --syntax-property: #6fd8d0 !important;
+}

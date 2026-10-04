@@ -1,0 +1,13 @@
+{
+  "id": "uber",
+  "name": "Uber",
+  "mode": "dark",
+  "swatches": [
+    "#0b0b0c",
+    "#16161a",
+    "#ffffff",
+    "#e3e3e6"
+  ],
+  "version": 1,
+  "author": "TerminalHub import"
+}

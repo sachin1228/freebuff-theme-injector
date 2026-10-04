@@ -1,0 +1,63 @@
+/* GitHub — ported from TerminalHub's brand theme ramp */
+:root,
+:root[data-theme],
+:root[data-theme=dark] {
+  color-scheme: dark !important;
+  --shell-base: #010409 !important;
+  --workspace-surface: #0d1117 !important;
+  --bg: var(--workspace-surface) !important;
+  --chrome: var(--shell-base) !important;
+  --surface: #10161c !important;
+  --surface-2: #161b22 !important;
+  --raised: #21262d !important;
+  --border: #30363d !important;
+  --text: #e6edf3 !important;
+  --muted: #8b949e !important;
+  --faint: #626a73 !important;
+  --accent: #e6edf3 !important;
+  --accent-dim: #626a73 !important;
+  --brand-1: #1d6e2c !important;
+  --brand-2: #238636 !important;
+  --brand-3: #86bc90 !important;
+  --brand: var(--brand-2) !important;
+  --brand-ink: #238636 !important;
+  --brand-dim: #1d6e2c !important;
+  --primary-action: var(--brand) !important;
+  --primary-action-text: #f5f6f7 !important;
+  --green: #238636 !important;
+  --ok: #238636 !important;
+  --success-text: #238636 !important;
+  --premium: #e6b455 !important;
+  --danger: #ff5252 !important;
+  --danger-text: #ff7b7b !important;
+  --warn: #e6a23c !important;
+  --warning-text: #e6b455 !important;
+  --info: #62b5ff !important;
+  --conflict: #e6a23c !important;
+  --merged: #c48aff !important;
+  --bubble: #161b22 !important;
+  --popover: #161b22 !important;
+  --input: #161b22 !important;
+  --placeholder: #626a73 !important;
+  --field-focus: #1d6e2c !important;
+  --selected: #21262d !important;
+  --tab-track: #10161c !important;
+  --tab-active-surface: #161b22 !important;
+  --tab-indicator: #2d333b !important;
+  --tab-selected-text: #e6edf3 !important;
+  --message-fill: var(--tab-indicator) !important;
+  --message-ink: var(--tab-selected-text) !important;
+  --matte-edge: rgb(255 255 255 / 7%) !important;
+  --control-border: var(--matte-edge) !important;
+  --control-border-hover: #444c56 !important;
+  --control-bg: var(--surface-2) !important;
+  --scrim: rgb(0 0 0 / 50%) !important;
+  --logo-filter: brightness(.92) !important;
+  --syntax-comment: #626a73 !important;
+  --syntax-keyword: #238636 !important;
+  --syntax-string: #7fd8a4 !important;
+  --syntax-number: #e6b455 !important;
+  --syntax-function: #62b5ff !important;
+  --syntax-type: #e6c56a !important;
+  --syntax-property: #6fd8d0 !important;
+}

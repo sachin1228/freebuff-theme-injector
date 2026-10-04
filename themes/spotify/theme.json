@@ -1,0 +1,13 @@
+{
+  "id": "spotify",
+  "name": "Spotify",
+  "mode": "dark",
+  "swatches": [
+    "#121212",
+    "#1f1f1f",
+    "#1db954",
+    "#ffffff"
+  ],
+  "version": 1,
+  "author": "TerminalHub import"
+}

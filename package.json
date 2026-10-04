@@ -1,0 +1,45 @@
+{
+  "name": "theme-injector",
+  "productName": "Theme Injector",
+  "version": "1.0.0",
+  "description": "Inject custom themes into Freebuff — a Themes button in its sidebar, plain-CSS token themes, live updates.",
+  "author": "Sachin Patil",
+  "license": "MIT",
+  "main": "src/main/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^37.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.uxcommunity.theme-injector",
+    "productName": "Theme Injector",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      { "from": "src/bridge", "to": "bridge" },
+      { "from": "themes", "to": "themes" },
+      { "from": "build/icon.png", "to": "icon.png" }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }, { "target": "zip", "arch": ["arm64"] }],
+      "identity": null
+    },
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false
+    }
+  }
+}

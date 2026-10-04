@@ -1,0 +1,63 @@
+/* Netflix — ported from TerminalHub's brand theme ramp */
+:root,
+:root[data-theme],
+:root[data-theme=dark] {
+  color-scheme: dark !important;
+  --shell-base: #000000 !important;
+  --workspace-surface: #141414 !important;
+  --bg: var(--workspace-surface) !important;
+  --chrome: var(--shell-base) !important;
+  --surface: #191919 !important;
+  --surface-2: #212121 !important;
+  --raised: #2c2c2c !important;
+  --border: #2b2b2b !important;
+  --text: #f5f5f1 !important;
+  --muted: #b3b3b0 !important;
+  --faint: #787875 !important;
+  --accent: #f5f5f1 !important;
+  --accent-dim: #787875 !important;
+  --brand-1: #c02b33 !important;
+  --brand-2: #ea353e !important;
+  --brand-3: #f39095 !important;
+  --brand: var(--brand-2) !important;
+  --brand-ink: #ea353e !important;
+  --brand-dim: #c02b33 !important;
+  --primary-action: var(--brand) !important;
+  --primary-action-text: #f5f6f7 !important;
+  --green: #ea353e !important;
+  --ok: #ea353e !important;
+  --success-text: #ea353e !important;
+  --premium: #e6b455 !important;
+  --danger: #ff5252 !important;
+  --danger-text: #ff7b7b !important;
+  --warn: #e6a23c !important;
+  --warning-text: #e6b455 !important;
+  --info: #62b5ff !important;
+  --conflict: #e6a23c !important;
+  --merged: #c48aff !important;
+  --bubble: #212121 !important;
+  --popover: #212121 !important;
+  --input: #212121 !important;
+  --placeholder: #787875 !important;
+  --field-focus: #c02b33 !important;
+  --selected: #2c2c2c !important;
+  --tab-track: #191919 !important;
+  --tab-active-surface: #212121 !important;
+  --tab-indicator: #383838 !important;
+  --tab-selected-text: #f5f5f1 !important;
+  --message-fill: var(--tab-indicator) !important;
+  --message-ink: var(--tab-selected-text) !important;
+  --matte-edge: rgb(255 255 255 / 7%) !important;
+  --control-border: var(--matte-edge) !important;
+  --control-border-hover: #414141 !important;
+  --control-bg: var(--surface-2) !important;
+  --scrim: rgb(0 0 0 / 50%) !important;
+  --logo-filter: brightness(.92) !important;
+  --syntax-comment: #787875 !important;
+  --syntax-keyword: #ea353e !important;
+  --syntax-string: #7fd8a4 !important;
+  --syntax-number: #e6b455 !important;
+  --syntax-function: #62b5ff !important;
+  --syntax-type: #e6c56a !important;
+  --syntax-property: #6fd8d0 !important;
+}

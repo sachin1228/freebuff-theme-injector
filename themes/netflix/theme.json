@@ -1,0 +1,13 @@
+{
+  "id": "netflix",
+  "name": "Netflix",
+  "mode": "dark",
+  "swatches": [
+    "#141414",
+    "#212121",
+    "#ea353e",
+    "#f5f5f1"
+  ],
+  "version": 1,
+  "author": "TerminalHub import"
+}

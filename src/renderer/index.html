@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:" />
+  <title>Theme Injector</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono&display=swap" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="face">
+    <header class="brand">
+      <img class="brand-mark" src="assets/logo.png" alt="" width="30" height="30" />
+      <span class="brand-name">Theme Injector</span>
+      <span class="brand-tag">for Freebuff</span>
+    </header>
+
+    <h1>Themes in Freebuff, from one switch.</h1>
+    <p class="sub">Turn it on and the <b>theme icon</b> appears in Freebuff&rsquo;s sidebar.</p>
+
+    <section class="switch-card">
+      <div class="switch-copy">
+        <div class="switch-title">Themes in Freebuff</div>
+        <div id="statusLine" class="status"><span class="dot"></span><span id="statusText">Checking Freebuff…</span></div>
+      </div>
+      <button id="toggle" class="switch" role="switch" aria-checked="false" aria-label="Themes in Freebuff" disabled>
+        <span class="knob"></span>
+      </button>
+    </section>
+
+    <section class="howto">
+      <h2>Where to find it</h2>
+      <div class="howto-body">
+        <ol>
+          <li><span><b>Turn the switch on.</b> Your Freebuff desktop app will restart.</span></li>
+          <li><span>Then in the <b>sidebar</b> you can find the <b>theme icon</b>.</span></li>
+        </ol>
+        <figure class="railshot">
+          <img class="railshot-img" src="assets/sidebar-rail.png" width="60" height="240"
+               alt="Freebuff's sidebar, with the theme icon at the bottom of the strip" />
+          <svg class="railshot-mark" width="240" height="240" viewBox="0 0 240 240" fill="none" aria-hidden="true">
+            <defs>
+              <marker id="railTip" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6.5" markerHeight="6.5" orient="auto">
+                <path class="tipshape" d="M0.5 0.8 L7.2 4 L0.5 7.2 Z" />
+              </marker>
+            </defs>
+            <circle class="ring" cx="26" cy="206" r="17" />
+            <circle class="ring ring-pulse" cx="26" cy="206" r="17" />
+            <path class="leader" d="M122 172 C 96 172 64 182 45 200" marker-end="url(#railTip)" />
+          </svg>
+          <figcaption class="railshot-label">theme icon</figcaption>
+        </figure>
+      </div>
+    </section>
+  </main>
+
+  <div id="modalBackdrop" class="backdrop hidden">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div id="modalBody"></div>
+    </div>
+  </div>
+  <div id="toast" class="toast hidden"></div>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+/* Spotify — ported from TerminalHub's brand theme ramp */
+:root,
+:root[data-theme],
+:root[data-theme=dark] {
+  color-scheme: dark !important;
+  --shell-base: #000000 !important;
+  --workspace-surface: #121212 !important;
+  --bg: var(--workspace-surface) !important;
+  --chrome: var(--shell-base) !important;
+  --surface: #171717 !important;
+  --surface-2: #1f1f1f !important;
+  --raised: #2a2a2a !important;
+  --border: #2a2a2a !important;
+  --text: #ffffff !important;
+  --muted: #b3b3b3 !important;
+  --faint: #7a7a7a !important;
+  --accent: #ffffff !important;
+  --accent-dim: #7a7a7a !important;
+  --brand-1: #189845 !important;
+  --brand-2: #1db954 !important;
+  --brand-3: #83d9a1 !important;
+  --brand: var(--brand-2) !important;
+  --brand-ink: #1db954 !important;
+  --brand-dim: #189845 !important;
+  --primary-action: var(--brand) !important;
+  --primary-action-text: #f5f6f7 !important;
+  --green: #1db954 !important;
+  --ok: #1db954 !important;
+  --success-text: #1db954 !important;
+  --premium: #e6b455 !important;
+  --danger: #ff5252 !important;
+  --danger-text: #ff7b7b !important;
+  --warn: #e6a23c !important;
+  --warning-text: #e6b455 !important;
+  --info: #62b5ff !important;
+  --conflict: #e6a23c !important;
+  --merged: #c48aff !important;
+  --bubble: #1f1f1f !important;
+  --popover: #1f1f1f !important;
+  --input: #1f1f1f !important;
+  --placeholder: #7a7a7a !important;
+  --field-focus: #189845 !important;
+  --selected: #2a2a2a !important;
+  --tab-track: #171717 !important;
+  --tab-active-surface: #1f1f1f !important;
+  --tab-indicator: #363636 !important;
+  --tab-selected-text: #ffffff !important;
+  --message-fill: var(--tab-indicator) !important;
+  --message-ink: var(--tab-selected-text) !important;
+  --matte-edge: rgb(255 255 255 / 7%) !important;
+  --control-border: var(--matte-edge) !important;
+  --control-border-hover: #404040 !important;
+  --control-bg: var(--surface-2) !important;
+  --scrim: rgb(0 0 0 / 50%) !important;
+  --logo-filter: brightness(.92) !important;
+  --syntax-comment: #7a7a7a !important;
+  --syntax-keyword: #1db954 !important;
+  --syntax-string: #7fd8a4 !important;
+  --syntax-number: #e6b455 !important;
+  --syntax-function: #62b5ff !important;
+  --syntax-type: #e6c56a !important;
+  --syntax-property: #6fd8d0 !important;
+}

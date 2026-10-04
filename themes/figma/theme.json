@@ -1,0 +1,13 @@
+{
+  "id": "figma",
+  "name": "Figma",
+  "mode": "dark",
+  "swatches": [
+    "#151519",
+    "#222227",
+    "#a259ff",
+    "#ebebf2"
+  ],
+  "version": 1,
+  "author": "TerminalHub import"
+}

@@ -74,14 +74,16 @@ async function ensureThemed() {
   busy = true
   try {
     if (await bridge.isAttached(fb.INSPECT_PORT)) return // already themed
+    // Stickiness only applies while Freebuff is actually open: quitting it is
+    // intent to close, and the injector must not reopen it. A plain launch
+    // (manual open, login item, or the app's own updater restarted it) is
+    // closed and relaunched with the bridge; Freebuff gets themed on that
+    // next open instead.
+    if (!(await fb.isFreebuffRunning())) return
     const exe = fb.detectFreebuff()
     if (!exe) return
-    if (await fb.isFreebuffRunning()) {
-      // Plain launch (manual open, login item, or the app's own updater
-      // restarted it). Close it, then relaunch with the bridge.
-      const done = await fb.quitFreebuff()
-      if (!done) return // user declined / stuck; retry on next tick
-    }
+    const done = await fb.quitFreebuff()
+    if (!done) return // user declined / stuck; retry on next tick
     await fb.launchFreebuff(exe, bridge.attachBridge)
   } catch (e) {
     // Never let a watcher tick crash the app; next tick retries. Log it —

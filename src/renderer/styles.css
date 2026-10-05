@@ -143,6 +143,56 @@ h1 { margin: 0 0 8px; font-size: 22px; font-weight: 600; letter-spacing: -0.024e
   .switch, .switch .knob { transition: none; }
 }
 
+/* ---------- performance panel ---------- */
+.perf {
+  margin-top: 28px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 18px 20px;
+}
+.perf-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.perf-sub { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.5; max-width: 56ch; }
+.pill {
+  flex: 0 0 auto; font-size: 11px; color: var(--muted);
+  border: 1px solid var(--line-strong); border-radius: 999px; padding: 3px 9px;
+}
+.pill.ok { color: var(--ok); border-color: rgba(0, 171, 62, .4); }
+.pill.warn { color: var(--warn); border-color: rgba(255, 178, 0, .4); }
+.perf-grid { display: flex; flex-direction: column; gap: 8px; margin: 14px 0 4px; }
+.perf .row { display: flex; align-items: center; justify-content: space-between; gap: 14px; font-size: 13px; color: var(--text-2); }
+.perf .select, .perf .num {
+  background: var(--surface-3); border: 1px solid var(--line-strong); color: var(--text);
+  border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.perf .select { min-width: 150px; }
+.perf .num { width: 66px; text-align: right; cursor: text; }
+.perf .num.wide { width: 96px; }
+.perf .check {
+  appearance: none; -webkit-appearance: none; flex: 0 0 auto;
+  width: 34px; height: 19px; border-radius: 999px; position: relative; cursor: pointer;
+  background: var(--surface-3); border: 1px solid var(--line-strong);
+  transition: background .16s ease, border-color .16s ease;
+}
+.perf .check::after {
+  content: ''; position: absolute; top: 1.5px; left: 1.5px;
+  width: 14px; height: 14px; border-radius: 50%; background: var(--text);
+  transition: transform .16s cubic-bezier(.4, 0, .2, 1), background .16s ease;
+}
+.perf .check:checked { background: var(--mark); border-color: var(--mark); }
+.perf .check:checked::after { transform: translateX(15px); background: var(--bg); }
+.perf .check:disabled { opacity: .45; }
+.perf-block { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.perf-block-head {
+  font-size: 11px; letter-spacing: 0.03em; text-transform: uppercase;
+  color: var(--faint); margin-bottom: 8px;
+}
+.perf-actions { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.bench-out {
+  margin: 12px 0 0; padding: 10px 12px; background: var(--surface-2);
+  border: 1px solid var(--line-strong); border-radius: 8px;
+  font-family: var(--font-mono); font-size: 11.5px; line-height: 1.55;
+  color: var(--text-2); white-space: pre-wrap; -webkit-user-select: text; user-select: text;
+}
+
 /* ---------- modal + toast ---------- */
 .backdrop {
   position: fixed; inset: 0; background: rgba(0, 0, 0, .72);

@@ -38,6 +38,8 @@ if (IS_ELECTRON && IS_BROWSER_PROCESS && !globalThis.__FBS_BOOT__) {
     const THEMES_DIR = path.join(ROOT, 'themes')
     const BRIDGE_DIR = __dirname
     const RUNTIME_PATH = path.join(BRIDGE_DIR, 'runtime.js')
+    const PERF_TAP_PATH = path.join(BRIDGE_DIR, 'perf-tap.js')
+    const PERF_OVERLAY_PATH = path.join(BRIDGE_DIR, 'perf-overlay.js')
     const STATE_PATH = path.join(ROOT, 'state.json')
     // Generated at runtime — the document-start half of the theme (see
     // writeEarlyPreload below).
@@ -56,30 +58,80 @@ if (IS_ELECTRON && IS_BROWSER_PROCESS && !globalThis.__FBS_BOOT__) {
 
     let lastPayload = null
 
+    /* The performance module's defaults. Enabled by default so the Injector's
+       panel works the moment the bridge lands; every switch is explicit in
+       the panel, and state.json is the single source of truth. */
+    const DEFAULT_PERF = {
+      enabled: true,
+      overlay: true,
+      nudge: true,
+      nudgeIdleMs: 12 * 60 * 1000,
+      nudgeContextTokens: 40000,
+      effortDefault: 'low',
+    }
+    const PERF_EFFORTS = ['low', 'medium', 'high', 'max']
+
+    function normalizePerf(raw) {
+      const p = raw && typeof raw === 'object' ? raw : {}
+      return {
+        enabled: p.enabled !== false,
+        overlay: p.overlay !== false,
+        nudge: p.nudge !== false,
+        nudgeIdleMs:
+          typeof p.nudgeIdleMs === 'number' && p.nudgeIdleMs >= 60000
+            ? p.nudgeIdleMs
+            : DEFAULT_PERF.nudgeIdleMs,
+        nudgeContextTokens:
+          typeof p.nudgeContextTokens === 'number' && p.nudgeContextTokens >= 1000
+            ? p.nudgeContextTokens
+            : DEFAULT_PERF.nudgeContextTokens,
+        // Missing = never chosen, and the requested default is low (DeepSeek's
+        // fastest effort). An explicit '' from the panel means "Model default"
+        // and is kept as such.
+        effortDefault:
+          p.effortDefault === undefined || p.effortDefault === null
+            ? DEFAULT_PERF.effortDefault
+            : PERF_EFFORTS.includes(p.effortDefault)
+              ? p.effortDefault
+              : '',
+      }
+    }
+
     /* The UI's own localStorage is per-origin, and Freebuff serves its window
        from a *different loopback port on every launch* — so a theme or font
        picked in the renderer is wiped by the next restart. The bridge keeps
        the authoritative copy in ~/.freebuff-theme-studio/state.json: it ships
-       the saved choice to each new document and mirrors the renderer back. */
+       the saved choice to each new document and mirrors the renderer back.
+       The Injector writes the perf and ads switches into the same file, so
+       every write is a read-merge-write — losing one owner's keys silently
+       disables it. */
     function readSettings() {
       try {
         const j = JSON.parse(fs.readFileSync(STATE_PATH, 'utf8'))
         return {
           theme: typeof j.theme === 'string' ? j.theme : null,
           font: typeof j.font === 'string' ? j.font : null,
+          // Ads are hidden by default: an absent key means never chosen.
+          hideAds: j.hideAds !== false,
+          perf: normalizePerf(j.perf),
         }
       } catch {
-        return { theme: null, font: null }
+        return { theme: null, font: null, hideAds: true, perf: normalizePerf(null) }
       }
     }
 
     function writeSettings(next) {
       try {
         fs.mkdirSync(ROOT, { recursive: true })
-        fs.writeFileSync(STATE_PATH, JSON.stringify(next))
-        return true
+        let existing = {}
+        try {
+          existing = JSON.parse(fs.readFileSync(STATE_PATH, 'utf8'))
+        } catch {}
+        const merged = { ...existing, ...next }
+        fs.writeFileSync(STATE_PATH, JSON.stringify(merged))
+        return merged
       } catch {
-        return false
+        return null
       }
     }
 
@@ -109,9 +161,15 @@ if (IS_ELECTRON && IS_BROWSER_PROCESS && !globalThis.__FBS_BOOT__) {
               if (!got) return
               if (!got.theme && !got.font && (settings.theme || settings.font)) return
               if (sameSettings(settings, got)) return
-              if (writeSettings(got)) {
-                settings = got
-                if (lastPayload) lastPayload.settings = got
+              const merged = writeSettings(got)
+              if (merged) {
+                settings = { ...settings, theme: got.theme, font: got.font }
+                if (lastPayload)
+                  lastPayload.settings = {
+                    theme: got.theme,
+                    font: got.font,
+                    hideAds: settings.hideAds,
+                  }
                 writeEarlyPreload()
                 // The palette can change while a splash is still on screen.
                 repaintLiveSplashes()
@@ -173,6 +231,12 @@ if (IS_ELECTRON && IS_BROWSER_PROCESS && !globalThis.__FBS_BOOT__) {
           themeId: theme ? theme.id : '',
           origins: appOrigins,
           fontId: settings.font,
+          // Ads are their own switch: the preload hides them at document-start
+          // with or without a theme.
+          adsEnabled: settings.hideAds !== false,
+          perfTap: lastPayload ? lastPayload.perfTap : '',
+          perfEnabled: lastPayload ? lastPayload.perfConfigured : false,
+          perfConfig: lastPayload ? lastPayload.perf : null,
         })
         // Atomic swap: a navigation must never read a half-written file.
         const tmp = PRELOAD_PATH + '.tmp'
@@ -221,13 +285,38 @@ if (IS_ELECTRON && IS_BROWSER_PROCESS && !globalThis.__FBS_BOOT__) {
       registerPreloadOn(session.defaultSession)
     }
 
+    let perfSources = null
+    function readPerfSources() {
+      if (perfSources) return perfSources
+      let tap = ''
+      let overlay = ''
+      try {
+        tap = fs.readFileSync(PERF_TAP_PATH, 'utf8')
+      } catch {}
+      try {
+        overlay = fs.readFileSync(PERF_OVERLAY_PATH, 'utf8')
+      } catch {}
+      perfSources = { tap, overlay }
+      return perfSources
+    }
+
     function buildPayload() {
       let runtime = ''
       try {
         runtime = fs.readFileSync(RUNTIME_PATH, 'utf8')
       } catch {}
       settings = readSettings()
-      lastPayload = { runtime, themes: readThemes(), settings }
+      const sources = readPerfSources()
+      const perf = settings.perf
+      lastPayload = {
+        runtime,
+        themes: readThemes(),
+        settings: { theme: settings.theme, font: settings.font, hideAds: settings.hideAds },
+        perf,
+        perfTap: sources.tap,
+        perfOverlay: sources.overlay,
+        perfConfigured: !!(perf.enabled && sources.tap && sources.overlay),
+      }
       writeEarlyPreload()
       return lastPayload
     }
@@ -247,13 +336,33 @@ if (IS_ELECTRON && IS_BROWSER_PROCESS && !globalThis.__FBS_BOOT__) {
     }
 
     function installCode(payload) {
-      return (
-        ';(function(){' +
-        payload.runtime +
+      let code = ';(function(){' + payload.runtime
+      code +=
         '\nwindow.__FBS_INSTALL__(' +
         JSON.stringify({ themes: payload.themes, settings: payload.settings }) +
-        ');})()'
-      )
+        ');'
+      if (payload.perfConfigured && payload.perfOverlay) {
+        // Main-world fallback: if the session preload missed this document
+        // (window loaded before the preload was registered), plant the tap
+        // here — EventSource reconnects and later turns are then covered.
+        if (payload.perfTap) {
+          code += '\ntry { if (!window.__FBS_PERF__) {' + payload.perfTap + '\n} } catch (e) {}'
+        }
+        code += '\n' + payload.perfOverlay
+        code +=
+          '\ntry { window.__FBS_PERF_UI_INSTALL__(' + JSON.stringify(payload.perf) + ') } catch (e) {}'
+        code +=
+          '\ntry { window.__FBS_PERF__ && window.__FBS_PERF__.setConfig(' +
+          JSON.stringify(payload.perf) +
+          ') } catch (e) {}'
+      } else {
+        code +=
+          '\ntry { window.__FBS_PERF_UI_INSTALL__ && window.__FBS_PERF_UI_INSTALL__(' +
+          JSON.stringify({ enabled: false }) +
+          ') } catch (e) {}'
+      }
+      code += '\n})()'
+      return code
     }
 
     function inject(contents) {
@@ -456,6 +565,21 @@ if (IS_ELECTRON && IS_BROWSER_PROCESS && !globalThis.__FBS_BOOT__) {
       } catch {}
     }
 
+    /* The Injector's Performance panel writes settings into state.json while
+       Freebuff runs; rebuilding the payload ships the new config to the tap
+       and overlay without a restart. ROOT is watched (not the file) so the
+       watcher survives the file being created, replaced or removed. */
+    let stateTimer = null
+    function watchStateFile() {
+      try {
+        fs.watch(ROOT, (_event, name) => {
+          if (name && name !== 'state.json') return
+          clearTimeout(stateTimer)
+          stateTimer = setTimeout(pushUpdate, 300)
+        })
+      } catch {}
+    }
+
     app.on('web-contents-created', (_event, contents) => {
       contents.on('dom-ready', () => {
         if (isUiTarget(contents)) inject(contents)
@@ -511,6 +635,7 @@ if (IS_ELECTRON && IS_BROWSER_PROCESS && !globalThis.__FBS_BOOT__) {
       // before its first window is created.
       registerPreloads()
       watchThemesDir()
+      watchStateFile()
     }
     if (app.isReady()) onReady()
     else app.on('ready', onReady)

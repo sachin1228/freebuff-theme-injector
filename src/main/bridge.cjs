@@ -70,7 +70,7 @@ class Cdp {
 function installBridge(bridgeSrcDir, bundledThemesDir) {
   fs.mkdirSync(BRIDGE_DIR, { recursive: true })
   fs.mkdirSync(THEMES_DIR, { recursive: true })
-  for (const f of ['early.cjs', 'boot.cjs', 'runtime.js', 'shared.cjs']) {
+  for (const f of ['early.cjs', 'boot.cjs', 'runtime.js', 'shared.cjs', 'perf-tap.js', 'perf-overlay.js']) {
     const src = path.join(bridgeSrcDir, f)
     if (fs.existsSync(src)) fs.copyFileSync(src, path.join(BRIDGE_DIR, f))
   }

@@ -30,6 +30,88 @@
       </button>
     </section>
 
+    <section class="perf">
+      <div class="perf-head">
+        <div>
+          <div class="switch-title">Ads</div>
+          <p class="perf-sub">Hides Freebuff&rsquo;s sponsored placements &mdash; the &ldquo;Ad&rdquo; cards in the chat, the one above the composer, and the full-content sponsor breaks. They disappear instantly; nothing else about Freebuff changes.</p>
+        </div>
+        <span id="adsState" class="pill">Checking&hellip;</span>
+      </div>
+      <div class="perf-grid">
+        <label class="row">
+          <span>Hide sponsored placements in Freebuff</span>
+          <input id="adsHide" class="check" type="checkbox" />
+        </label>
+      </div>
+    </section>
+
+    <section class="perf">
+      <div class="perf-head">
+        <div>
+          <div class="switch-title">Performance</div>
+          <p class="perf-sub">Times every Freebuff turn (first token, thinking, compaction) in an overlay inside Freebuff, and can default new DeepSeek threads to a faster effort.</p>
+        </div>
+        <span id="perfState" class="pill">Checking…</span>
+      </div>
+
+      <div class="perf-grid">
+        <label class="row">
+          <span>Overlay in Freebuff</span>
+          <input id="perfOverlay" class="check" type="checkbox" />
+        </label>
+        <label class="row">
+          <span>New-thread reasoning effort</span>
+          <select id="perfEffort" class="select">
+            <option value="">Model default</option>
+            <option value="low">low — fastest</option>
+            <option value="medium">medium</option>
+            <option value="high">high</option>
+            <option value="max">max</option>
+          </select>
+        </label>
+        <label class="row">
+          <span>Compaction nudge</span>
+          <input id="perfNudge" class="check" type="checkbox" />
+        </label>
+        <label class="row">
+          <span>Nudge after idle</span>
+          <input id="perfIdle" class="num" type="number" min="1" max="60" step="1" />
+        </label>
+        <label class="row">
+          <span>…when context is over</span>
+          <input id="perfCtx" class="num wide" type="number" min="1000" step="1000" />
+        </label>
+      </div>
+
+      <div class="perf-block">
+        <div class="perf-block-head">BYOK · DeepSeek direct</div>
+        <div id="byokLine" class="status"><span class="dot"></span><span id="byokText">Checking…</span></div>
+        <div class="perf-actions">
+          <button id="byokSetup" class="btn">Set up connection</button>
+          <button id="byokCheck" class="btn">Check route</button>
+        </div>
+      </div>
+
+      <div class="perf-block">
+        <div class="perf-block-head">Benchmark · DeepSeek V4.1 Flash</div>
+        <p class="perf-sub">Creates a fresh thread in your most recent project and sends one short prompt, then reports the tap's timings.</p>
+        <div class="perf-actions">
+          <select id="benchRuns" class="select">
+            <option value="1">1 run</option>
+            <option value="2" selected>2 runs</option>
+            <option value="3">3 runs</option>
+          </select>
+          <select id="benchEffort" class="select">
+            <option value="low">low effort</option>
+            <option value="high">high effort</option>
+          </select>
+          <button id="benchRun" class="btn primary">Run in Freebuff</button>
+        </div>
+        <pre id="benchOut" class="bench-out hidden"></pre>
+      </div>
+    </section>
+
     <section class="howto">
       <h2>Where to find it</h2>
       <div class="howto-body">

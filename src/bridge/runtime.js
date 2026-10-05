@@ -7,6 +7,9 @@
  *    completely inert anywhere else.
  *  - Applies the theme + font tokens to every app document, so the splash,
  *    the welcome screen and the shell all paint in the active palette.
+ *  - Hides Freebuff's sponsored placements when the bridge's hideAds setting
+ *    is on — the "Ad" cards in the chat, the composer placements and the
+ *    full-content sponsor break. Stands alone: it hides with no theme too.
  *  - Adds a "Themes" palette button to the bottom of the rail.
  *  - Opens a picker: theme rows plus a font dropdown (system / Inter /
  *    Geist, the latter two streamed from Google Fonts). Choices persist in
@@ -20,6 +23,7 @@
   var LS_FONT = 'fbs.font'
   var STYLE_ID = 'fbs-theme-style'
   var FONT_STYLE_ID = 'fbs-font-style'
+  var ADS_STYLE_ID = 'fbs-ads-style'
   var UI_ID = 'fbs-theme-ui'
   var NS = 'fbs'
 
@@ -150,6 +154,21 @@
     // Same treatment for the mark: the app inverts it for its own light theme.
     ':root[data-fbs-theme] :is(.splash-logo,.loading-screen-logo) {',
     ' filter: var(--fbs-logo-filter, none) !important;',
+    '}',
+  ].join('\n')
+
+  /* Freebuff's sponsored surfaces: the "Ad"-badged cards in the chat stream and
+     at the thread bottom, the composer / skill-picker placements, and the
+     full-content sponsor break. CSS-only hiding leaves the app's own ad DOM in
+     place, so its observers and store keep working — only paint changes, and the
+     placement simply never renders. Separate from the theme: this rides
+     state.json's hideAds switch. KEEP-IN-SYNC with shared.cjs (ADS_CSS). */
+  var ADS_CSS = [
+    // Marker: lets dropPreloadSheets recognise the generated preload's adopted
+    // sheet even when no theme CSS is in there to carry a --fbs- token.
+    ':root { --fbs-ads: 1; }',
+    '.sponsored-ad, .ad-banner, .ad-card, .partner-placement, .ad-showcase {',
+    ' display: none !important;',
     '}',
   ].join('\n')
 
@@ -323,6 +342,27 @@
     } catch {}
     refreshPicker()
     repaintSquircles() // new metrics change element sizes
+  }
+
+  /* ---------- sponsored placements ---------- */
+
+  function adsStyleEl() {
+    var el = document.getElementById(ADS_STYLE_ID)
+    if (!el) {
+      el = document.createElement('style')
+      el.id = ADS_STYLE_ID
+      document.head.appendChild(el)
+    }
+    return el
+  }
+
+  /* The bridge's own switch, independent of the theme: ads hide whether or
+     not one is active. An absent setting means the bridge shipped it without
+     one — the default is on. */
+  function applyAds(hide) {
+    var el = adsStyleEl()
+    document.head.appendChild(el) // move to end so equal-specificity rules win
+    el.textContent = hide === false ? '' : ADS_CSS
   }
 
   /* ---------- chrome (button + panel) ---------- */
@@ -603,7 +643,7 @@
   // Bump when the picker markup or behaviour changes: an older closure that
   // already owns the chrome keeps serving its own (stale) panel after a live
   // push, so a version mismatch has to take the UI over instead of delegating.
-  var VERSION = '7'
+  var VERSION = '8'
 
   // Capture any installer from a previous injection *before* redefining.
   var prevInstall = typeof window.__FBS_INSTALL__ === 'function' ? window.__FBS_INSTALL__ : null
@@ -661,7 +701,7 @@
     } catch {}
   }
 
-  function applyStored() {
+  function applyStored(hideAds) {
     dropPreloadSheets()
     var active = storedActive()
     if (active && !findTheme(active)) {
@@ -671,6 +711,7 @@
       applyTheme(active)
     }
     applyFont(storedFont())
+    applyAds(hideAds)
   }
 
   /* Freebuff's window is served from a fresh loopback port on every launch,
@@ -716,13 +757,13 @@
         s.installed = true
         ensureChrome()
         seedSettings(settings)
-        applyStored()
+        applyStored(settings && settings.hideAds)
       })
       return
     }
     ensureChrome()
     seedSettings(settings)
-    applyStored()
+    applyStored(settings && settings.hideAds)
   }
 
   try {

@@ -6,7 +6,6 @@ Desktop app that themes [Freebuff](https://freebuff.com) with community themes �
 
 - Launches Freebuff with an inspector port and attaches a small bridge to its Electron main process. Nothing is ever written inside `Freebuff.app`, so app updates can't break it.
 - The bridge generates a session preload that applies the active theme's CSS at document-start, themes the launch splash and the window's background color, and adds a theme + font picker to Freebuff's sidebar.
-- The same injection hides Freebuff's sponsored placements — the "Ad" cards in the chat, the one above the composer, and full-content sponsor breaks. It's on by default, works with or without a theme, and has its own switch in the Injector.
 - A background watcher keeps themes "sticky": if Freebuff starts without the bridge (manual open, auto-start, updater), it's relaunched once, themed. Freebuff is only ever themed when it's open — quitting it stays quit. Flip the switch off to get the default look back.
 
 ## Use

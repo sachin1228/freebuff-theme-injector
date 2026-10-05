@@ -18,8 +18,6 @@ const path = require('node:path')
 
 const bridge = require('./bridge.cjs')
 const fb = require('./freebuff.cjs')
-const byokApi = require('./byok.cjs')
-const bench = require('./bench.cjs')
 
 /* Renamed from "Freebuff Theme Studio" to "Theme Injector". Electron derives
    userData from the product name, so pin it (dev and packaged must agree) and
@@ -52,52 +50,6 @@ function migrateSettings() {
 
 const WATCH_INTERVAL_MS = 5000
 
-/* Performance module defaults — mirror boot.cjs's normalizePerf. The Injector
-   is the owner of these settings; it writes them into the bridge's state.json
-   on every change, and the bridge pushes them into Freebuff live. */
-const PERF_DEFAULTS = {
-  enabled: true,
-  overlay: true,
-  nudge: true,
-  nudgeIdleMs: 12 * 60 * 1000,
-  nudgeContextTokens: 40000,
-  effortDefault: 'low',
-}
-const PERF_EFFORTS = ['low', 'medium', 'high', 'max']
-
-function normalizePerf(raw) {
-  const p = raw && typeof raw === 'object' ? raw : {}
-  return {
-    enabled: p.enabled !== false,
-    overlay: p.overlay !== false,
-    nudge: p.nudge !== false,
-    nudgeIdleMs:
-      typeof p.nudgeIdleMs === 'number' && p.nudgeIdleMs >= 60000 ? p.nudgeIdleMs : PERF_DEFAULTS.nudgeIdleMs,
-    nudgeContextTokens:
-      typeof p.nudgeContextTokens === 'number' && p.nudgeContextTokens >= 1000
-        ? p.nudgeContextTokens
-        : PERF_DEFAULTS.nudgeContextTokens,
-    // Missing = never chosen, and the requested default is low (DeepSeek's
-    // fastest effort). An explicit '' from the panel means "Model default"
-    // and is kept as such.
-    effortDefault:
-      p.effortDefault === undefined || p.effortDefault === null
-        ? PERF_DEFAULTS.effortDefault
-        : PERF_EFFORTS.includes(p.effortDefault)
-          ? p.effortDefault
-          : '',
-  }
-}
-
-/* Ads defaults — mirror boot.cjs's readSettings. The Injector owns the switch;
-   it lands in the bridge's state.json as `hideAds` and the bridge re-applies
-   it live. On by default: Freebuff's sponsored placements stay hidden unless
-   the user turns them back on. */
-function normalizeAds(raw) {
-  const a = raw && typeof raw === 'object' ? raw : {}
-  return { hide: a.hide !== false }
-}
-
 let win = null
 let tray = null
 let enabled = false
@@ -105,34 +57,10 @@ let busy = false
 let watchTimer = null
 
 function readSettings() {
-  try {
-    const j = JSON.parse(fs.readFileSync(SETTINGS_FILE(), 'utf8'))
-    return { enabled: !!j.enabled, perf: normalizePerf(j.perf), ads: normalizeAds(j.ads) }
-  } catch {
-    return { enabled: false, perf: normalizePerf(null), ads: normalizeAds(null) }
-  }
+  try { return JSON.parse(fs.readFileSync(SETTINGS_FILE(), 'utf8')) } catch { return { enabled: false } }
 }
-function patchSettings(patch) {
-  let current = {}
-  try { current = JSON.parse(fs.readFileSync(SETTINGS_FILE(), 'utf8')) } catch {}
-  const next = { ...current, ...patch }
-  try { fs.writeFileSync(SETTINGS_FILE(), JSON.stringify(next)) } catch {}
-  return next
-}
-
-/** The bridge reads its config from ~/.freebuff-theme-studio/state.json. The
-    bridge mirrors the picker's own choices back into the same file, so every
-    write is a read-merge-write — dropping an owner's key silently disables it. */
-function stateFilePath() {
-  return path.join(bridge.ROOT, 'state.json')
-}
-function syncStateToBridge(patch) {
-  try {
-    fs.mkdirSync(bridge.ROOT, { recursive: true })
-    let existing = {}
-    try { existing = JSON.parse(fs.readFileSync(stateFilePath(), 'utf8')) } catch {}
-    fs.writeFileSync(stateFilePath(), JSON.stringify({ ...existing, ...patch }))
-  } catch {}
+function writeSettings(s) {
+  try { fs.writeFileSync(SETTINGS_FILE(), JSON.stringify(s)) } catch {}
 }
 
 /* ---------- the sticky-themes watcher ---------- */
@@ -206,7 +134,7 @@ function registerIpc() {
     const exe = fb.detectFreebuff()
     if (!exe) return { ok: false, error: 'Freebuff was not found. Install it from freebuff.com first.' }
     enabled = true
-    patchSettings({ enabled: true })
+    writeSettings({ enabled: true })
     startWatch()
     if (await bridge.isAttached(fb.INSPECT_PORT)) return { ok: true, note: 'Themes are already on.' }
     if (await fb.isFreebuffRunning()) {
@@ -220,74 +148,11 @@ function registerIpc() {
       return { ok: false, error: 'Could not attach the theme bridge: ' + e.message }
     }
   })
-  ipcMain.handle('perf:get', async () => {
-    const s = readSettings()
-    return {
-      perf: s.perf,
-      keyPresent: !!process.env.DEEPSEEK_API_KEY,
-      running: await fb.isFreebuffRunning(),
-      themed: await bridge.isAttached(fb.INSPECT_PORT),
-      enabled,
-    }
-  })
-  ipcMain.handle('perf:set', async (_event, patch) => {
-    const s = readSettings()
-    const perf = normalizePerf({ ...s.perf, ...(patch && typeof patch === 'object' ? patch : {}) })
-    patchSettings({ perf })
-    syncStateToBridge({ perf })
-    return { perf }
-  })
-  ipcMain.handle('ads:get', async () => {
-    return { ads: readSettings().ads }
-  })
-  ipcMain.handle('ads:set', async (_event, patch) => {
-    const s = readSettings()
-    const ads = normalizeAds({ ...s.ads, ...(patch && typeof patch === 'object' ? patch : {}) })
-    patchSettings({ ads })
-    syncStateToBridge({ hideAds: ads.hide })
-    return { ads }
-  })
-  ipcMain.handle('byok:status', async () => {
-    try {
-      return await byokApi.status(fb.INSPECT_PORT, process.env)
-    } catch (e) {
-      return { keyPresent: !!process.env.DEEPSEEK_API_KEY, inspectorUp: false, error: e.message }
-    }
-  })
-  ipcMain.handle('byok:setup', async () => {
-    if (!(await bridge.isAttached(fb.INSPECT_PORT))) {
-      return { ok: false, error: 'Turn themes on and let Freebuff restart, then set up the connection.' }
-    }
-    try {
-      return await byokApi.setup(fb.INSPECT_PORT)
-    } catch (e) {
-      return { ok: false, error: e.message }
-    }
-  })
-  ipcMain.handle('byok:validate', async () => {
-    try {
-      const st = await byokApi.status(fb.INSPECT_PORT, process.env)
-      if (!st.connection) return { ok: false, error: 'No DeepSeek connection to validate yet.' }
-      return await byokApi.validate(fb.INSPECT_PORT, st.connection.id, st.connection.revision)
-    } catch (e) {
-      return { ok: false, error: e.message }
-    }
-  })
-  ipcMain.handle('bench:run', async (_event, opts) => {
-    if (!(await bridge.isAttached(fb.INSPECT_PORT))) {
-      return { ok: false, error: 'Freebuff must be running with themes on to run the benchmark.' }
-    }
-    try {
-      return await bench.run(fb.INSPECT_PORT, opts || {})
-    } catch (e) {
-      return { ok: false, error: e.message }
-    }
-  })
   ipcMain.handle('app:disable', async () => {
     const exe = fb.detectFreebuff()
     if (!exe) return { ok: false, error: 'Freebuff was not found.' }
     enabled = false
-    patchSettings({ enabled: false })
+    writeSettings({ enabled: false })
     stopWatch()
     const wasThemed = await bridge.isAttached(fb.INSPECT_PORT)
     if (await fb.isFreebuffRunning()) {
@@ -314,7 +179,7 @@ function showWindow() {
 function createWindow() {
   win = new BrowserWindow({
     width: 660,
-    height: 820,
+    height: 688,
     minWidth: 560,
     minHeight: 560,
     title: 'Theme Injector',
@@ -374,12 +239,10 @@ if (!gotLock) {
   app.whenReady().then(() => {
     migrateSettings()
     bridge.installBridge(BRIDGE_SRC, BUNDLED_THEMES)
-    const boot = readSettings()
-    syncStateToBridge({ perf: boot.perf, hideAds: boot.ads.hide })
     registerIpc()
     createWindow()
     createTray()
-    enabled = !!boot.enabled
+    enabled = !!readSettings().enabled
     if (enabled) startWatch() // resume stickiness across app restarts
     app.on('activate', () => {
       if (win && win.isDestroyed()) win = null

@@ -4,10 +4,11 @@ Desktop app that themes [Freebuff](https://freebuff.com) with community themes �
 
 ## How it works
 
-- Launches Freebuff with Chromium's remote debugging port open and injects a small theme runtime into the app's pages over the DevTools Protocol. Freebuff 0.0.200+ **disables the Electron fuses for `NODE_OPTIONS` and `--inspect`**, so the old main-process bridge can no longer attach; the debug port is the channel that still works. Nothing is ever written inside `Freebuff.app`, so app updates can't break it.
+- Freebuff 0.0.201 refuses to start with any `--remote-debugging-port`/`-pipe`/`-address` switch (`app.exit(1)`), and its Electron fuses disable `NODE_OPTIONS`, `--inspect` and `ELECTRON_RUN_AS_NODE`. The Injector therefore builds a **private patched copy** of the installed app at `~/.freebuff-theme-studio/freebuff-themed/Freebuff.app` — the launch guard is neutralised inside `app.asar` (same byte length, since the `OnlyLoadAppFromAsar` fuse means an unpacked directory is ignored), the bundle is ad-hoc signed, and its updater is pointed at a dead loopback feed so the copy can never be replaced by a stock build. The installed `Freebuff.app` is never modified; the copy is rebuilt when Freebuff's version changes.
+- Launches that copy with Chromium's remote debugging port open and injects a small theme runtime into the app's pages over the DevTools Protocol.
 - The runtime applies the active theme's CSS at document-start, themes the launch splash and the window background, and adds a theme + font picker to the bottom of Freebuff's sidebar.
 - It also hides Freebuff's sponsored placements — the "Ad" cards in the chat and above the composer, the large showcase card, the sponsor break and the promo spotlight. It's on by default, works with or without a theme, and has its own switch in the Injector window (changes apply live).
-- A background watcher keeps themes "sticky": if Freebuff starts without the injector (manual open, auto-start, updater), it's relaunched once, themed. Freebuff is only ever themed when it's open — quitting it stays quit. Flip the switch off to get the default look back.
+- A background watcher keeps themes "sticky": a Freebuff started without the injector (manual open, auto-start, updater) is closed and the themed copy launched instead. Freebuff is only ever themed when it's open — quitting it stays quit. Flip the switch off to get the default look back.
 
 ## Use
 

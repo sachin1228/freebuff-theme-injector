@@ -92,7 +92,11 @@ async function refresh() {
 async function setToggle(wantOn) {
   if (busy) return
   busy = true
-  status = { ...status, themed: !wantOn ? status.themed : false, busyNote: wantOn ? 'Restarting Freebuff with themes…' : 'Restarting Freebuff without themes…' }
+  status = {
+    ...status,
+    themed: !wantOn ? status.themed : false,
+    busyNote: wantOn ? 'Preparing themed Freebuff and restarting it…' : 'Restarting Freebuff without themes…',
+  }
   render()
   try {
     const r = wantOn ? await window.studio.enable() : await window.studio.disable()

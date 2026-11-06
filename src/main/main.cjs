@@ -20,6 +20,7 @@ const path = require('node:path')
 
 const bridge = require('./bridge.cjs')
 const fb = require('./freebuff.cjs')
+const patch = require('./patch.cjs')
 
 /* Renamed from "Freebuff Theme Studio" to "Theme Injector". Electron derives
    userData from the product name, so pin it (dev and packaged must agree) and
@@ -53,6 +54,9 @@ function migrateSettings() {
 const WATCH_INTERVAL_MS = 5000
 
 let win = null
+let themedExe = null
+let preparing = null
+let prepareError = null
 let tray = null
 let enabled = false
 let busy = false
@@ -60,6 +64,25 @@ let watchTimer = null
 
 function readSettings() {
   try { return JSON.parse(fs.readFileSync(SETTINGS_FILE(), 'utf8')) } catch { return { enabled: false } }
+}
+
+/* Freebuff 0.0.201 refuses to start with a debugging port, so themes live in a
+   patched private copy (see patch.cjs). Build it once when the switch is on. */
+async function ensureThemedExe(exe) {
+  if (themedExe && fs.existsSync(themedExe)) return themedExe
+  if (!preparing) {
+    preparing = patch.ensureThemedCopy(exe).finally(() => { preparing = null })
+  }
+  try {
+    const meta = await preparing
+    themedExe = (meta && meta.exe) || null
+    prepareError = null
+  } catch (e) {
+    themedExe = null
+    prepareError = e && e.message
+    console.error('[theme-injector] could not build the themed Freebuff copy:', prepareError)
+  }
+  return themedExe
 }
 function writeSettings(s) {
   try { fs.writeFileSync(SETTINGS_FILE(), JSON.stringify(s)) } catch {}
@@ -92,6 +115,8 @@ async function ensureThemed() {
     if (!pids.length) { plainSince = { key: '', at: 0 }; return }
     const exe = fb.detectFreebuff()
     if (!exe) return
+    const themed = await ensureThemedExe(exe)
+    if (!themed) return
     const key = pids.join(',')
     const now = Date.now()
     if (plainSince.key !== key) plainSince = { key, at: now } // fresh process — clock its boot
@@ -99,7 +124,7 @@ async function ensureThemed() {
     const done = await fb.quitFreebuff()
     if (!done) return // user declined / stuck; retry on next tick
     plainSince = { key: '', at: 0 }
-    await fb.launchFreebuff(exe, bridge.attachBridge)
+    await fb.launchFreebuff(themed, bridge.attachBridge)
   } catch (e) {
     // Never let a watcher tick crash the app; next tick retries. Log it —
     // a swallowed failure here is how a stuck-unthemed Freebuff hides.
@@ -124,7 +149,7 @@ function stopWatch() {
 
 function registerIpc() {
   ipcMain.handle('app:status', async () => {
-    const exe = fb.detectFreebuff()
+    const exe = fb.detectFreebuff() || (fs.existsSync(patch.PATCHED_EXE) ? patch.PATCHED_EXE : null)
     return {
       exe,
       running: await fb.isFreebuffRunning(),
@@ -139,25 +164,29 @@ function registerIpc() {
     return ok ? { ok: true, hideAds: want } : { ok: false, error: 'Could not save the ad setting.' }
   })
   ipcMain.handle('app:enable', async () => {
-    const exe = fb.detectFreebuff()
+    const exe = fb.detectFreebuff() || (fs.existsSync(patch.PATCHED_EXE) ? patch.PATCHED_EXE : null)
     if (!exe) return { ok: false, error: 'Freebuff was not found. Install it from freebuff.com first.' }
     enabled = true
     writeSettings({ enabled: true })
     startWatch()
     if (await bridge.isAttached(fb.DEBUG_PORT)) return { ok: true, note: 'Themes are already on.' }
+    const themed = await ensureThemedExe(exe)
+    if (!themed) {
+      return { ok: false, error: 'Could not prepare the themed copy of Freebuff: ' + (prepareError || 'unknown error') }
+    }
     if (await fb.isFreebuffRunning()) {
       const done = await fb.quitFreebuff()
       if (!done) return { ok: false, error: 'Freebuff did not close. Close it manually, then flip the switch again.' }
     }
     try {
-      await fb.launchFreebuff(exe, bridge.attachBridge)
+      await fb.launchFreebuff(themed, bridge.attachBridge)
       return { ok: true }
     } catch (e) {
       return { ok: false, error: 'Could not attach the theme bridge: ' + e.message }
     }
   })
   ipcMain.handle('app:disable', async () => {
-    const exe = fb.detectFreebuff()
+    const exe = fb.detectFreebuff() || (fs.existsSync(patch.PATCHED_EXE) ? patch.PATCHED_EXE : null)
     if (!exe) return { ok: false, error: 'Freebuff was not found.' }
     enabled = false
     writeSettings({ enabled: false })
@@ -251,7 +280,13 @@ if (!gotLock) {
     createWindow()
     createTray()
     enabled = !!readSettings().enabled
-    if (enabled) startWatch() // resume stickiness across app restarts
+    if (enabled) {
+      startWatch() // resume stickiness across app restarts
+      // Build/refresh the patched copy in the background so the first switch-on
+      // does not stall on it.
+      const exe = fb.detectFreebuff()
+      if (exe) ensureThemedExe(exe)
+    }
     app.on('activate', () => {
       if (win && win.isDestroyed()) win = null
       if (!win) createWindow()

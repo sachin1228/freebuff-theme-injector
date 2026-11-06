@@ -1,7 +1,7 @@
 {
   "name": "theme-injector",
   "productName": "Theme Injector",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Inject custom themes into Freebuff — a Themes button in its sidebar, plain-CSS token themes, live updates, no ads.",
   "author": "Sachin Patil",
   "license": "MIT",

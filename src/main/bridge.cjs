@@ -146,6 +146,9 @@ function isSplashUrl(url) {
 function isUiTargetUrl(url) {
   if (typeof url !== 'string') return false
   if (/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?\//i.test(url)) return true
+  // Freebuff 0.0.201 opens its main window on the web app itself, not on the
+  // loopback loader — that document is the app UI and the theme's real home.
+  if (/^https?:\/\/([a-z0-9-]+\.)*freebuff\.com(:\d+)?\//i.test(url)) return true
   return isSplashUrl(url)
 }
 

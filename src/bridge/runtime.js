@@ -187,6 +187,7 @@
   var ADS_CSS = [
     // Marker: lets dropPreloadSheets recognise this block on old installs.
     ':root { --fbs-ads: 1; }',
+    '.cloud-ad-frame, .cloud-composer-ads,',
     '.sponsored-ad, .ad-banner, .ad-card, .partner-placement, .ad-showcase,',
     '.sponsor-intermission, .spotlight-card, .spotlight-backdrop,',
     '[data-ad-slot], [data-sponsor-ad], [data-advertisement] {',
@@ -270,12 +271,87 @@
   }
 
 
+  /* ---------- desktop web app (freebuff.com) ---------- */
+
+  /* Freebuff 0.0.201's window is the freebuff.com web app, not the loopback
+     shell. It has its own desktop token layer (--dk-bg, --dk-sidebar-canvas,
+     all hex) and keeps the unprefixed names for Tailwind's hsl(var(--x))
+     triples. So the theme is re-declared under --fbs-t-* (never touching the
+     page's own variables) and mapped onto the --dk-* layer. The mapping has
+     to sit on every element: the shell re-declares some --dk-* names on its
+     own containers, which shadows anything merely inherited from <body>. */
+  var WEB_TOKENS = [
+    'bg', 'chrome', 'shell-base', 'workspace-surface', 'surface', 'surface-2',
+    'raised', 'border', 'text', 'muted', 'faint', 'placeholder', 'accent',
+    'accent-dim', 'brand', 'brand-1', 'brand-2', 'brand-3', 'brand-dim',
+    'brand-ink', 'primary-action', 'primary-action-text', 'bubble',
+    'message-fill', 'message-ink', 'selected', 'scrim', 'input', 'control-bg',
+    'control-border', 'control-border-hover', 'field-focus', 'logo-filter',
+    'matte-edge', 'tab-track', 'tab-indicator', 'tab-selected-text',
+    'tab-active-surface', 'switch-track-on', 'switch-thumb-on', 'danger',
+    'danger-text', 'warn', 'warning-text', 'success-text', 'ok', 'green',
+    'info', 'premium', 'conflict', 'merged', 'syntax-comment',
+    'syntax-function', 'syntax-keyword', 'syntax-number', 'syntax-property',
+    'syntax-string', 'syntax-type',
+  ]
+  var WEB_ALIASES = [
+    ['fg', 'text'],
+    ['text-muted', 'muted'],
+    ['text-secondary', 'muted'],
+    ['block-header-bg', 'surface-2'],
+    ['terminal-background', 'bg'],
+    ['ad-fill', 'raised'],
+    ['ad-ink', 'text'],
+  ]
+
+  function isWebAppDoc() {
+    try {
+      return /(^|\.)freebuff\.com$/i.test(location.hostname)
+    } catch {
+      return false
+    }
+  }
+
+  function webThemeCss(theme) {
+    var scoped = String(theme.css || '').replace(/--([a-z0-9-]+)/gi, '--fbs-t-$1')
+    var decl = []
+    var i
+    for (i = 0; i < WEB_TOKENS.length; i++) {
+      decl.push('--dk-' + WEB_TOKENS[i] + ': var(--fbs-t-' + WEB_TOKENS[i] + ') !important;')
+    }
+    for (i = 0; i < WEB_ALIASES.length; i++) {
+      decl.push(
+        '--dk-' + WEB_ALIASES[i][0] + ': var(--fbs-t-' + WEB_ALIASES[i][1] + ') !important;',
+      )
+    }
+    return [
+      scoped,
+      'body.fb-desktop, body.fb-desktop * { ' + decl.join(' ') + ' }',
+      'body.fb-desktop { background-color: var(--dk-bg) !important;' +
+        ' color: var(--dk-text) !important; }',
+      // The palette button and panel read unprefixed tokens; give them the
+      // theme's values locally so the page's own names stay untouched.
+      '.fbs-theme-btn, .fbs-panel {' +
+        '--text: var(--fbs-t-text);--muted: var(--fbs-t-muted);' +
+        '--border: var(--fbs-t-border);--brand: var(--fbs-t-brand);' +
+        '--surface: var(--fbs-t-surface);--surface-2: var(--fbs-t-surface-2);' +
+        '--raised: var(--fbs-t-raised);--popover: var(--fbs-t-surface);' +
+        '--control-bg: var(--fbs-t-control-bg);' +
+        '--control-bg-hover: var(--fbs-t-raised);' +
+        '--warning-text: var(--fbs-t-warning-text);}',
+    ].join('\n')
+  }
+
   function applyTheme(id) {
     var theme = id ? findTheme(id) : null
     var el = activeStyleEl()
     var host = styleHost()
     if (host) host.appendChild(el) // move to end so equal-specificity rules win
-    el.textContent = theme ? theme.css + '\n' + BRIDGE_CSS + '\n' + splashTintCss(theme) + '\n' : ''
+    el.textContent = theme
+      ? isWebAppDoc()
+        ? webThemeCss(theme)
+        : theme.css + '\n' + BRIDGE_CSS + '\n' + splashTintCss(theme) + '\n'
+      : ''
     if (theme) document.documentElement.setAttribute('data-fbs-theme', theme.id)
     else document.documentElement.removeAttribute('data-fbs-theme')
     try {
@@ -357,7 +433,10 @@
         f.family.indexOf(',') !== -1 ? f.family : "'" + f.family + "', " + FONT_FALLBACK
       el.textContent =
         ':root, :root[data-theme], :root[data-theme=dark], :root[data-theme=light] {' +
-        '--font-sans: ' + value + ' !important; }'
+        '--font-sans: ' + value + ' !important; }' +
+        (isWebAppDoc()
+          ? '\nbody.fb-desktop { --dk-font-sans: ' + value + ' !important; }'
+          : '')
     } else {
       el.textContent = ''
     }
@@ -773,7 +852,7 @@
   // Bump when the picker markup or behaviour changes: an older closure that
   // already owns the chrome keeps serving its own (stale) panel after a live
   // push, so a version mismatch has to take the UI over instead of delegating.
-  var VERSION = '9'
+  var VERSION = '10'
 
   // Capture any installer from a previous injection *before* redefining.
   var prevInstall = typeof window.__FBS_INSTALL__ === 'function' ? window.__FBS_INSTALL__ : null

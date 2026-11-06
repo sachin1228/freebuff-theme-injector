@@ -1,14 +1,16 @@
 /**
  * Theme Injector — main process.
- * One job: keep the theme bridge installed, and flip Freebuff between
- * themed (enable) and plain (disable) launches.
+ * One job: keep the theme runtime injected into Freebuff, and flip Freebuff
+ * between themed (enable) and plain (disable) launches.
  *
- * While the switch is ON a background watcher keeps themes "sticky": if
- * Freebuff is found running WITHOUT the bridge attached — e.g. it was
+ * Freebuff 0.0.200+ fuses off NODE_OPTIONS and --inspect, so the injection
+ * goes through Chromium's remote debugging port into the renderer (see
+ * bridge.cjs). While the switch is ON a background watcher keeps themes
+ * "sticky": if Freebuff is found running WITHOUT that port — e.g. it was
  * reopened normally, auto-started, or restarted by its own updater — the
  * watcher relaunches it once with themes. Nothing is ever written inside
- * Freebuff.app, so app updates can't break the injection; they only need
- * the one re-attach, which the watcher performs automatically.
+ * Freebuff.app, so app updates can't break the injection; they only need the
+ * one re-attach, which the watcher performs automatically.
  */
 'use strict'
 
@@ -80,7 +82,7 @@ async function ensureThemed() {
   if (busy) return
   busy = true
   try {
-    if (await bridge.isAttached(fb.INSPECT_PORT)) { plainSince = { key: '', at: 0 }; return } // already themed
+    if (await bridge.isAttached(fb.DEBUG_PORT)) { plainSince = { key: '', at: 0 }; return } // already themed
     // Stickiness only applies while Freebuff is actually open: quitting it is
     // intent to close, and the injector must not reopen it. A plain launch
     // (manual open, login item, or the app's own updater restarted it) is
@@ -126,9 +128,15 @@ function registerIpc() {
     return {
       exe,
       running: await fb.isFreebuffRunning(),
-      themed: await bridge.isAttached(fb.INSPECT_PORT),
+      themed: await bridge.isAttached(fb.DEBUG_PORT),
       enabled,
+      hideAds: bridge.getHideAds(),
     }
+  })
+  ipcMain.handle('app:setAds', async (_event, hide) => {
+    const want = hide === true
+    const ok = await bridge.setHideAds(want)
+    return ok ? { ok: true, hideAds: want } : { ok: false, error: 'Could not save the ad setting.' }
   })
   ipcMain.handle('app:enable', async () => {
     const exe = fb.detectFreebuff()
@@ -136,7 +144,7 @@ function registerIpc() {
     enabled = true
     writeSettings({ enabled: true })
     startWatch()
-    if (await bridge.isAttached(fb.INSPECT_PORT)) return { ok: true, note: 'Themes are already on.' }
+    if (await bridge.isAttached(fb.DEBUG_PORT)) return { ok: true, note: 'Themes are already on.' }
     if (await fb.isFreebuffRunning()) {
       const done = await fb.quitFreebuff()
       if (!done) return { ok: false, error: 'Freebuff did not close. Close it manually, then flip the switch again.' }
@@ -154,7 +162,7 @@ function registerIpc() {
     enabled = false
     writeSettings({ enabled: false })
     stopWatch()
-    const wasThemed = await bridge.isAttached(fb.INSPECT_PORT)
+    const wasThemed = await bridge.isAttached(fb.DEBUG_PORT)
     if (await fb.isFreebuffRunning()) {
       const done = await fb.quitFreebuff()
       if (!done) return { ok: false, error: 'Freebuff did not close. Close it manually and try again.' }

@@ -65,6 +65,7 @@ h1 { margin: 0 0 8px; font-size: 22px; font-weight: 600; letter-spacing: -0.024e
   background: var(--surface); border: 1px solid var(--line);
   border-radius: 12px; padding: 18px 20px;
 }
+.ads-card { margin-top: 10px; }
 .switch-title { font-size: 14px; font-weight: 500; margin-bottom: 5px; }
 .status { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
 .status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: 0 0 auto; }

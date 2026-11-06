@@ -1,6 +1,13 @@
 /**
- * Freebuff app detection, launch (with the theme bridge attached) and quit,
+ * Freebuff app detection, launch (with the theme injector attached) and quit,
  * for macOS and Windows.
+ *
+ * The injector needs a channel into the running app. Freebuff 0.0.200+ sets
+ * the Electron fuses `EnableNodeOptionsEnvironmentVariable` and
+ * `EnableNodeCliInspectArguments` to Disabled, which kills the old two hooks
+ * (NODE_OPTIONS --require and --inspect). Chromium's remote debugging port is
+ * not fused, so that is the channel: it reaches every renderer, which is where
+ * the theme lives.
  */
 'use strict'
 
@@ -9,22 +16,14 @@ const os = require('node:os')
 const path = require('node:path')
 const { execFile } = require('node:child_process')
 
-const INSPECT_PORT = 41731
+/* Loopback CDP port Freebuff is launched with. The app itself does not use it
+   (electron/cdp-bridge.cjs is an HTTP bridge scoped to preview webviews). */
+const DEBUG_PORT = 41731
 
-const BRIDGE_DIR = path.join(os.homedir(), '.freebuff-theme-studio', 'bridge')
-const EARLY_ENTRY = path.join(BRIDGE_DIR, 'early.cjs')
-
-/* Remove only the --require entry this app adds to NODE_OPTIONS, so a user's
-   own options survive and a "plain" launch never loads the bridge.
-   KEEP-IN-SYNC: the same pattern lives in bridge/shared.cjs (used by
-   early.cjs / boot.cjs to clean the environment inside Freebuff). */
-function stripEarlyRequire(value) {
-  if (typeof value !== 'string' || !value) return ''
-  return value
-    .replace(/--require\s+("[^"]*early\.cjs"|'[^']*early\.cjs'|\S*early\.cjs)/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
+/* Both loopback spellings: Chromium rejects a WebSocket whose Origin is not
+   allowlisted, and the client's origin can be either. No wildcard — a web page
+   in any browser must not be able to drive Freebuff over this port. */
+const DEBUG_ORIGINS = `http://127.0.0.1:${DEBUG_PORT},http://localhost:${DEBUG_PORT}`
 
 function exeCandidates() {
   if (process.platform === 'darwin') {
@@ -105,45 +104,42 @@ async function quitFreebuff() {
   return !(await isFreebuffRunning())
 }
 
-/** Launch Freebuff with the bridge preloaded and attach it via the inspector.
-    Two hooks are armed: `--require` (runs before Freebuff's own first frame
-    when the NODE_OPTIONS fuse allows it) and the inspector attach, which must
-    land. Packaged builds commonly reject NODE_OPTIONS — measured on Freebuff:
-    Electron logs "Most NODE_OPTIONs are not supported in packaged apps" and
-    replaces the var with " " — so the attach is the path that can never be
-    skipped; the --require entry is a free upgrade for builds that permit it. */
+/** Launch Freebuff with the CDP port open and attach the theme runtime. */
 function launchFreebuff(exePath, attachFn) {
   const { spawn } = require('node:child_process')
-  const env = { ...process.env }
-  if (fs.existsSync(EARLY_ENTRY)) {
-    const entry = `--require "${EARLY_ENTRY}"`
-    const existing = typeof env.NODE_OPTIONS === 'string' ? env.NODE_OPTIONS.trim() : ''
-    env.NODE_OPTIONS = existing ? existing + ' ' + entry : entry
-  }
-  const child = spawn(exePath, [`--inspect=127.0.0.1:${INSPECT_PORT}`], {
-    detached: true,
-    stdio: 'ignore',
-    env,
-  })
+  const child = spawn(
+    exePath,
+    [
+      `--remote-debugging-port=${DEBUG_PORT}`,
+      `--remote-allow-origins=${DEBUG_ORIGINS}`,
+    ],
+    {
+      detached: true,
+      stdio: 'ignore',
+      env: { ...process.env },
+    },
+  )
   child.unref()
-  return attachFn(INSPECT_PORT)
+  return attachFn(DEBUG_PORT)
 }
 
-/** Launch Freebuff normally (no bridge, no inspector, no preload). */
+/** Launch Freebuff normally (no debug port, no injection). */
 function launchPlain(exePath) {
   const { spawn } = require('node:child_process')
-  const env = { ...process.env }
-  if (typeof env.NODE_OPTIONS === 'string') {
-    const cleaned = stripEarlyRequire(env.NODE_OPTIONS)
-    if (cleaned) env.NODE_OPTIONS = cleaned
-    else delete env.NODE_OPTIONS
-  }
   const child = spawn(exePath, [], {
     detached: true,
     stdio: 'ignore',
-    env,
+    env: { ...process.env },
   })
   child.unref()
 }
 
-module.exports = { detectFreebuff, isFreebuffRunning, freebuffPids, quitFreebuff, launchFreebuff, launchPlain, INSPECT_PORT }
+module.exports = {
+  detectFreebuff,
+  isFreebuffRunning,
+  freebuffPids,
+  quitFreebuff,
+  launchFreebuff,
+  launchPlain,
+  DEBUG_PORT,
+}

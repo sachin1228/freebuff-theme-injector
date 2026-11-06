@@ -1,12 +1,15 @@
 /**
  * Freebuff Theme Bridge — renderer runtime.
  *
- * Executed inside Freebuff's UI window by boot.cjs. It:
+ * Injected into Freebuff's UI documents by the Injector's main process (over
+ * the Chromium DevTools Protocol). It:
  *  - Verifies it is running inside Freebuff's own UI document (the shell's
  *    left icon rail, or the pre-login loading / welcome screens) and stays
  *    completely inert anywhere else.
  *  - Applies the theme + font tokens to every app document, so the splash,
  *    the welcome screen and the shell all paint in the active palette.
+ *  - Hides Freebuff's sponsored placements (chat cards, the composer banner,
+ *    the showcase card and the sponsor break) — on by default, theme or not.
  *  - Adds a "Themes" palette button to the bottom of the rail.
  *  - Opens a picker: theme rows plus a font dropdown (system / Inter /
  *    Geist, the latter two streamed from Google Fonts). Choices persist in
@@ -20,6 +23,8 @@
   var LS_FONT = 'fbs.font'
   var STYLE_ID = 'fbs-theme-style'
   var FONT_STYLE_ID = 'fbs-font-style'
+  var ADS_STYLE_ID = 'fbs-ads-style'
+  var SPLASH_STYLE_ID = 'fbs-splash'
   var UI_ID = 'fbs-theme-ui'
   var NS = 'fbs'
 
@@ -65,12 +70,20 @@
 
   /* ---------- theme application ---------- */
 
+  /* The runtime is registered as a document-start script, so it can run before
+     <head> exists. Always place styles on whatever host is available; a style
+     appended to <html> is honoured by the parser and moved into <head> later. */
+  function styleHost() {
+    return document.head || document.documentElement || null
+  }
+
   function activeStyleEl() {
     var el = document.getElementById(STYLE_ID)
     if (!el) {
       el = document.createElement('style')
       el.id = STYLE_ID
-      document.head.appendChild(el)
+      var host = styleHost()
+      if (host) host.appendChild(el)
     }
     return el
   }
@@ -81,22 +94,24 @@
     return null
   }
 
-  /* Freebuff "paints" rounded elements (count badges, composer box, tabs,
-     streak banner…) by baking their computed background into an inline SVG
-     data URL. The app's own observer re-bakes an element when its class,
-     style or a handful of attributes change — but a theme swap only mutates
-     CSS custom properties, so baked colors go stale. Their observer treats
-     any mutation on <html> as "re-measure everything", so touching an
-     inline custom property on documentElement forces a full repaint. */
+  /* Freebuff paints its squircle fills onto controls (dataset.fill /
+     --squircle-paint) by measuring computed colours. Its observer re-measures
+     when `data-squircle-paint` changes anywhere or `data-theme` flips, but a
+     theme swap only mutates CSS variables — so the baked fills go stale. Set
+     and clear the marker attribute on <html> to trigger that re-measure.
+     (The old shell listened for inline style changes there instead.) */
   function repaintSquircles() {
     try {
       var d = document.documentElement
-      var stamp = 'fbs-' + Date.now() + '-' + Math.floor(Math.random() * 1e6)
-      d.style.setProperty('--fbs-repaint', stamp)
+      d.setAttribute('data-squircle-paint', '')
+      d.removeAttribute('data-squircle-paint')
       // Second pass next frame: elements whose layout settles late.
       if (typeof requestAnimationFrame === 'function') {
         requestAnimationFrame(function () {
-          try { d.style.setProperty('--fbs-repaint', stamp + '-2') } catch {}
+          try {
+            d.setAttribute('data-squircle-paint', '')
+            d.removeAttribute('data-squircle-paint')
+          } catch {}
         })
       }
     } catch {}
@@ -150,6 +165,32 @@
     // Same treatment for the mark: the app inverts it for its own light theme.
     ':root[data-fbs-theme] :is(.splash-logo,.loading-screen-logo) {',
     ' filter: var(--fbs-logo-filter, none) !important;',
+    '}',
+    /* Desktop-shell tokens (Freebuff 0.0.200+). The rewrite added a second
+       token layer for the chrome: sidebar canvas, panel dividers and nav
+       icon colours. Themes predate it, so map the new names onto the theme
+       tokens — otherwise those surfaces keep the app's neutral defaults. */
+    ':root, :root[data-theme] {',
+    ' --panel-divider: var(--border) !important;',
+    ' --sidebar-canvas: var(--workspace-surface, var(--bg)) !important;',
+    ' --sidebar-edge: var(--border) !important;',
+    ' --nav-muted: var(--muted) !important;',
+    ' --nav-text: var(--text) !important;',
+    '}',
+  ].join('\n')
+
+  /* Freebuff's sponsored placements: the "Ad"-badged cards in the chat stream
+     and above the composer, the large showcase card, the full-content sponsor
+     break and the promo spotlight. CSS-only hiding leaves the app's own ad DOM
+     in place — its store and observers keep working, only paint changes. This
+     rides the injector's hideAds setting and works with or without a theme. */
+  var ADS_CSS = [
+    // Marker: lets dropPreloadSheets recognise this block on old installs.
+    ':root { --fbs-ads: 1; }',
+    '.sponsored-ad, .ad-banner, .ad-card, .partner-placement, .ad-showcase,',
+    '.sponsor-intermission, .spotlight-card, .spotlight-backdrop,',
+    '[data-ad-slot], [data-sponsor-ad], [data-advertisement] {',
+    ' display: none !important;',
     '}',
   ].join('\n')
 
@@ -232,7 +273,8 @@
   function applyTheme(id) {
     var theme = id ? findTheme(id) : null
     var el = activeStyleEl()
-    document.head.appendChild(el) // move to end so equal-specificity rules win
+    var host = styleHost()
+    if (host) host.appendChild(el) // move to end so equal-specificity rules win
     el.textContent = theme ? theme.css + '\n' + BRIDGE_CSS + '\n' + splashTintCss(theme) + '\n' : ''
     if (theme) document.documentElement.setAttribute('data-fbs-theme', theme.id)
     else document.documentElement.removeAttribute('data-fbs-theme')
@@ -264,7 +306,8 @@
     if (!el) {
       el = document.createElement('style')
       el.id = FONT_STYLE_ID
-      document.head.appendChild(el)
+      var host = styleHost()
+      if (host) host.appendChild(el)
     }
     return el
   }
@@ -294,7 +337,8 @@
     el.addEventListener('error', function () {
       noteFontFail(f)
     })
-    document.head.appendChild(el)
+    var host = styleHost()
+    if (host) host.appendChild(el)
     return el
   }
 
@@ -325,6 +369,107 @@
     repaintSquircles() // new metrics change element sizes
   }
 
+  /* ---------- sponsored placements ---------- */
+
+  function adsStyleEl() {
+    var el = document.getElementById(ADS_STYLE_ID)
+    if (!el) {
+      el = document.createElement('style')
+      el.id = ADS_STYLE_ID
+      var host = styleHost()
+      if (host) host.appendChild(el)
+    }
+    return el
+  }
+
+  /* Independent of the theme: ads hide whether or not one is active. An
+     absent setting means the injector shipped it without one — default on. */
+  function applyAds(hide) {
+    var el = adsStyleEl()
+    var host = styleHost()
+    if (host) host.appendChild(el) // move to end so equal-specificity rules win
+    el.textContent = hide === false ? '' : ADS_CSS
+  }
+
+  /* ---------- launch splash (data: URL, no app tokens) ---------- */
+
+  function isSplashDoc() {
+    try {
+      return location.protocol === 'data:' && !!document.querySelector('.bar')
+    } catch {
+      return false
+    }
+  }
+
+  function splashPalette() {
+    try {
+      var s = state()
+      var id = (s.settings && s.settings.theme) || storedActive()
+      if (!id) return null
+      var theme = findTheme(id)
+      if (!theme || !theme.css) return null
+      var pick = function (names) {
+        for (var i = 0; i < names.length; i++) {
+          var v = tokenValue(theme.css, names[i], 0)
+          if (v && /^#([0-9a-f]{3,8})$/i.test(v.trim())) return v.trim()
+        }
+        return null
+      }
+      var bg = pick(['bg', 'workspace-surface', 'shell-base'])
+      if (!bg) return null
+      return {
+        bg: bg,
+        track: pick(['surface-2', 'raised', 'surface']) || bg,
+        bar: pick(['brand-dim', 'brand', 'brand-2']) || bg,
+        light: theme.mode === 'light',
+      }
+    } catch {
+      return null
+    }
+  }
+
+  /* The splash is Freebuff's first frame and is built by its main process with
+     a fixed palette. Paint it with the active theme so the handoff to the app
+     document never flashes the default. */
+  function applySplash() {
+    try {
+      if (location.protocol !== 'data:' || !document.querySelector('.bar')) return false
+      var p = splashPalette()
+      if (!p) return false
+      var host = styleHost()
+      if (!host) return false
+      var el = document.getElementById(SPLASH_STYLE_ID)
+      if (!el) {
+        el = document.createElement('style')
+        el.id = SPLASH_STYLE_ID
+        host.appendChild(el)
+      }
+      el.textContent =
+        'html,body{background:' + p.bg + ' !important}' +
+        '.bar{background:' + p.track + ' !important}' +
+        '.bar span{background:' + p.bar + ' !important}' +
+        '.mark{filter:' + (p.light ? 'brightness(0) invert(0.16)' : 'brightness(0.88)') + ' !important}'
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  var splashWatchInstalled = false
+  function watchSplashDoc() {
+    if (splashWatchInstalled) return
+    splashWatchInstalled = true
+    try {
+      if (location.protocol !== 'data:') return
+      var run = function () { applySplash() }
+      run()
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', run, { once: true })
+        document.addEventListener('readystatechange', run)
+      }
+    } catch {}
+  }
+
   /* ---------- chrome (button + panel) ---------- */
 
   function baseCss() {
@@ -347,7 +492,7 @@
       ' margin-bottom:3px;border:1px solid var(--border);border-radius:var(--radius-md,8px);background:transparent;',
       ' color:var(--text);font:inherit;font-size:var(--font-size-body,13px);text-align:left;cursor:pointer}',
       '.fbs-row:hover{background:var(--control-bg-hover,rgb(255 255 255 / 5%))}',
-      '.fbs-row.fbs-sel{border-color:var(--brand);background:var(--selected)}',
+      '.fbs-row.fbs-sel{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 16%,var(--surface))}',
       '.fbs-sw{display:flex;flex:0 0 auto}',
       '.fbs-sw i{width:10px;height:10px;border-radius:50%;margin-left:-3.5px;border:1.5px solid var(--popover,var(--surface))}',
       '.fbs-sw i:first-child{margin-left:0}',
@@ -453,9 +598,19 @@
   function refreshPicker() {
     if (panelEl && panelEl.isConnected) {
       panelEl.innerHTML = panelHtml()
-      var skip = panelEl.querySelectorAll('*')
-      for (var si = 0; si < skip.length; si++) skip[si].setAttribute('data-stream-word', '')
+      optOutOfPaint(panelEl)
     }
+  }
+
+  /* The app paints squircle fills onto every <button> it finds. The picker is
+     our own chrome and its rows are buttons, so mark the whole subtree as
+     opted out and let the panel's CSS own every colour. (`data-squircle=off`
+     is the desktop shell's own opt-out marker, used on its checkboxes.) */
+  function optOutOfPaint(root) {
+    if (!root) return
+    root.setAttribute('data-squircle', 'off')
+    var nodes = root.querySelectorAll('*')
+    for (var i = 0; i < nodes.length; i++) nodes[i].setAttribute('data-squircle', 'off')
   }
 
   function closePanel() {
@@ -471,13 +626,9 @@
     panelEl.className = 'fbs-panel'
     panelEl.id = UI_ID + '-panel'
     panelEl.innerHTML = panelHtml()
-    // Opt the whole picker out of Freebuff's squircle SVG baking
-    // (data-stream-word is the app's own skip marker for its paint
-    // observer). Plain CSS then keeps the panel's colors locked to the
-    // live theme tokens as soon as a theme is switched.
-    panelEl.setAttribute('data-stream-word', '')
-    var skip = panelEl.querySelectorAll('*')
-    for (var si = 0; si < skip.length; si++) skip[si].setAttribute('data-stream-word', '')
+    // Keep the app's squircle painter away from the picker so its colours
+    // stay locked to the live theme tokens as soon as a theme is switched.
+    optOutOfPaint(panelEl)
     document.body.appendChild(panelEl)
     var r = btn.getBoundingClientRect()
     var top = Math.min(r.top, window.innerHeight - panelEl.offsetHeight - 12)
@@ -513,8 +664,11 @@
   /* ---------- rail attachment ---------- */
 
   function findRail() {
-    // Two shell builds exist: the left icon nav (nav.shell-navigation) and
-    // the older `.rail` column. Prefer whichever is present.
+    // Three shell builds: the desktop shell keeps its rail buttons in
+    // .shell-navigation-bottom (bottom-aligned), older builds used
+    // .shell-navigation-top, and the first Electron shell had .rail.
+    var bottom = document.querySelector('.shell-navigation-bottom')
+    if (bottom) return { container: bottom, btnClass: 'shell-nav-button' }
     var top = document.querySelector('.shell-navigation-top')
     if (top) return { container: top, btnClass: 'shell-nav-button' }
     var rail = document.querySelector('.rail')
@@ -545,26 +699,41 @@
   }
 
   function ensureChrome() {
+    var s = state()
+    var host = styleHost()
+    if (!host) return
     if (!document.getElementById(STYLE_ID)) {
       var el = document.createElement('style')
       el.id = STYLE_ID
-      document.head.appendChild(el)
+      host.appendChild(el)
     }
     if (!document.getElementById(UI_ID + '-base')) {
       var base = document.createElement('style')
       base.id = UI_ID + '-base'
-      document.head.appendChild(base)
+      host.appendChild(base)
     }
     // Always rewrite the chrome CSS: a live push may carry new panel styles.
-    document.getElementById(UI_ID + '-base').textContent = baseCss()
+    var baseEl = document.getElementById(UI_ID + '-base')
+    if (baseEl) baseEl.textContent = baseCss()
     if (activeStyleEl()) activeStyleEl().setAttribute('data-fbs', '1')
     attachButton()
+    // Document-start injection can beat <body>; the rail watcher needs it.
+    if (!document.body) {
+      if (!s.chromeDeferred) {
+        s.chromeDeferred = true
+        document.addEventListener('DOMContentLoaded', function () {
+          s.chromeDeferred = false
+          if (s.installed) ensureChrome()
+        }, { once: true })
+      }
+      return
+    }
     // Re-attach if React re-renders the rail away.
-    if (!state().railObserver) {
-      state().railObserver = new MutationObserver(function () {
+    if (!s.railObserver) {
+      s.railObserver = new MutationObserver(function () {
         if (!document.querySelector('.fbs-theme-btn')) attachButton()
       })
-      state().railObserver.observe(document.body, { childList: true, subtree: true })
+      s.railObserver.observe(document.body, { childList: true, subtree: true })
     }
   }
 
@@ -580,7 +749,8 @@
     if (d.getElementById('startup-recovery')) return true
     if (d.title === 'Freebuff Desktop') return true
     return !!d.querySelector(
-      '.splash,.splash-background,.loading-screen,.shell-navigation-top,.project-sidebar,nav.shell-navigation,.rail',
+      '.splash,.splash-background,.loading-screen,.desktop-shell,.shell-navigation,' +
+        '.shell-navigation-bottom,.shell-navigation-top,.project-sidebar,.rail',
     )
   }
 
@@ -603,7 +773,7 @@
   // Bump when the picker markup or behaviour changes: an older closure that
   // already owns the chrome keeps serving its own (stale) panel after a live
   // push, so a version mismatch has to take the UI over instead of delegating.
-  var VERSION = '7'
+  var VERSION = '9'
 
   // Capture any installer from a previous injection *before* redefining.
   var prevInstall = typeof window.__FBS_INSTALL__ === 'function' ? window.__FBS_INSTALL__ : null
@@ -661,7 +831,7 @@
     } catch {}
   }
 
-  function applyStored() {
+  function applyStored(hideAds) {
     dropPreloadSheets()
     var active = storedActive()
     if (active && !findTheme(active)) {
@@ -671,6 +841,8 @@
       applyTheme(active)
     }
     applyFont(storedFont())
+    applyAds(hideAds)
+    applySplash()
   }
 
   /* Freebuff's window is served from a fresh loopback port on every launch,
@@ -689,6 +861,22 @@
     } catch {}
   }
 
+  /* Document-start injection can run before <html> exists. Wait for the root
+     element, then apply — still long before React mounts the shell. */
+  function whenRoot(fn) {
+    if (document.documentElement) return fn()
+    try {
+      var mo = new MutationObserver(function () {
+        if (!document.documentElement) return
+        mo.disconnect()
+        fn()
+      })
+      mo.observe(document, { childList: true, subtree: true })
+    } catch {
+      setTimeout(fn, 50)
+    }
+  }
+
   window.__FBS_INSTALL__ = function (payload) {
     var s = state()
     window.__FBS_VERSION__ = VERSION
@@ -705,7 +893,25 @@
     var themes = Array.isArray(payload) ? payload : (payload && payload.themes) || []
     var settings = Array.isArray(payload) ? null : payload && payload.settings
     s.themes = themes
-    if (!s.installed) {
+    s.settings = settings || null
+    var hideAds = !settings || settings.hideAds !== false
+    s.hideAds = hideAds
+    watchSplashDoc()
+    whenRoot(function () {
+      // The splash is a Freebuff document too, but it has no shell: paint it
+      // with the theme's palette and stop there.
+      if (isSplashDoc()) {
+        applySplash()
+        return
+      }
+      // Tokens first: they need no <body> and have to land before React's
+      // first render, which is still ahead of us at document-start.
+      seedSettings(settings)
+      applyStored(hideAds)
+      if (s.installed) {
+        ensureChrome()
+        return
+      }
       s.ownsInstall = true
       // Only run inside the real Freebuff shell.
       waitForShell(function (isShell) {
@@ -715,14 +921,8 @@
         }
         s.installed = true
         ensureChrome()
-        seedSettings(settings)
-        applyStored()
       })
-      return
-    }
-    ensureChrome()
-    seedSettings(settings)
-    applyStored()
+    })
   }
 
   try {

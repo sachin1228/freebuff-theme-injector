@@ -4,11 +4,15 @@ const $ = (s) => document.querySelector(s)
 const toggle = $('#toggle')
 const statusLine = $('#statusLine')
 const statusText = $('#statusText')
+const adsToggle = $('#adsToggle')
+const adsLine = $('#adsLine')
+const adsText = $('#adsText')
 const backdrop = $('#modalBackdrop')
 const modalBody = $('#modalBody')
 
 let status = null
 let busy = false
+let adsBusy = false
 
 function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -64,6 +68,19 @@ function render() {
   }
   statusLine.className = cls
   statusText.textContent = txt
+
+  // Ads hide with or without a theme; the switch lives next to the theme one.
+  const hideAds = status.hideAds !== false
+  adsToggle.setAttribute('aria-checked', hideAds ? 'true' : 'false')
+  adsToggle.disabled = adsBusy || !status.exe
+  // With the injector off nothing is applied, so say so instead of claiming
+  // the ads are already hidden.
+  adsLine.className = 'status' + (hideAds && status.enabled ? ' ok' : '')
+  adsText.textContent = hideAds
+    ? status.enabled
+      ? 'On — sponsored cards, banners and breaks are hidden'
+      : 'On — applies when the injector is on'
+    : 'Off — Freebuff shows its sponsored placements'
 }
 
 async function refresh() {
@@ -85,6 +102,30 @@ async function setToggle(wantOn) {
     else toast('Themes are off — Freebuff relaunched as usual')
   } finally {
     busy = false
+    status = await window.studio.status()
+    render()
+  }
+}
+
+adsToggle.onclick = async () => {
+  if (!status || adsBusy) return
+  const want = adsToggle.getAttribute('aria-checked') !== 'true'
+  adsBusy = true
+  status = { ...status, hideAds: want }
+  render()
+  try {
+    const r = await window.studio.setAds(want)
+    if (!r || !r.ok) {
+      status.hideAds = !want
+      toast((r && r.error) || 'Could not change the ad setting', 'err')
+    } else {
+      toast(want ? 'Ads hidden — sponsored placements are gone' : 'Ads are back in Freebuff')
+    }
+  } catch {
+    status.hideAds = !want
+    toast('Could not change the ad setting', 'err')
+  } finally {
+    adsBusy = false
     status = await window.studio.status()
     render()
   }

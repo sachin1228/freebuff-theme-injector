@@ -181,9 +181,19 @@
 
   /* Freebuff's sponsored placements: the "Ad"-badged cards in the chat stream
      and above the composer, the large showcase card, the full-content sponsor
-     break and the promo spotlight. CSS-only hiding leaves the app's own ad DOM
-     in place — its store and observers keep working, only paint changes. This
-     rides the injector's hideAds setting and works with or without a theme. */
+     break and the promo spotlight. This rides the injector's hideAds setting
+     and works with or without a theme.
+
+     The app actively audits these slots: every placement registers a sampler
+     that reads the slot's anchor/iframe and reports "hidden" when any ancestor
+     computes display:none, visibility:hidden/collapse or opacity:0, when the
+     slot sits under [hidden]/[inert]/aria-hidden, or when the anchor's box has
+     zero width or height. One hidden sample held for 1.5s flips a shared
+     "ad blocker" flag, and the composer then refuses to send until some slot
+     reads visible again. So ads are *not* display:none'd here. They stay laid
+     out and keep a non-zero box (zoom scales the box, it does not zero it),
+     with a tiny zoom and near-zero opacity doing the hiding — the sampler
+     reports visible, nothing is painted, and the ad controls are inert. */
   var ADS_CSS = [
     // Marker: lets dropPreloadSheets recognise this block on old installs.
     ':root { --fbs-ads: 1; }',
@@ -191,7 +201,12 @@
     '.sponsored-ad, .ad-banner, .ad-card, .partner-placement, .ad-showcase,',
     '.sponsor-intermission, .spotlight-card, .spotlight-backdrop,',
     '[data-ad-slot], [data-sponsor-ad], [data-advertisement] {',
-    ' display: none !important;',
+    ' zoom: 0.01 !important;',
+    // 0.001, never 0: the audit compares the computed string to "0".
+    ' opacity: 0.001 !important;',
+    ' pointer-events: none !important;',
+    ' user-select: none !important;',
+    ' transition: none !important;',
     '}',
   ].join('\n')
 
@@ -827,6 +842,9 @@
     var d = document
     if (d.getElementById('startup-recovery')) return true
     if (d.title === 'Freebuff Desktop') return true
+    // The web-app window (freebuff.com) server-renders this class on <body>,
+    // so it identifies the app even before React mounts the shell.
+    if (d.body && d.body.classList.contains('fb-desktop')) return true
     return !!d.querySelector(
       '.splash,.splash-background,.loading-screen,.desktop-shell,.shell-navigation,' +
         '.shell-navigation-bottom,.shell-navigation-top,.project-sidebar,.rail',
@@ -852,7 +870,7 @@
   // Bump when the picker markup or behaviour changes: an older closure that
   // already owns the chrome keeps serving its own (stale) panel after a live
   // push, so a version mismatch has to take the UI over instead of delegating.
-  var VERSION = '10'
+  var VERSION = '12'
 
   // Capture any installer from a previous injection *before* redefining.
   var prevInstall = typeof window.__FBS_INSTALL__ === 'function' ? window.__FBS_INSTALL__ : null

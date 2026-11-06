@@ -557,7 +557,21 @@ async function attachBridge(port) {
   throw new Error('Freebuff renderer did not accept the theme runtime (' + seen + ')')
 }
 
-/** True when a Freebuff launched with the debug port has the runtime live. */
+/** Version string of the runtime the injector ships right now. */
+function expectedRuntimeVersion() {
+  try {
+    const m = /var VERSION = '([^']+)'/.exec(fs.readFileSync(RUNTIME_PATH, 'utf8'))
+    return m ? m[1] : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * True when a Freebuff launched with the debug port has *this* runtime live.
+ * A page still carrying an older runtime counts as unattached, so a running
+ * copy gets re-injected in place instead of being relaunched or ignored.
+ */
 async function isAttached(port) {
   let list
   try {
@@ -565,20 +579,31 @@ async function isAttached(port) {
   } catch {
     return false
   }
+  const expected = expectedRuntimeVersion()
   const targets = list.filter(isFreebuffTarget).slice(0, 3)
   if (!targets.length) return false
   for (const target of targets) {
     let cdp = null
     try {
       cdp = await Cdp.connect(target.webSocketDebuggerUrl, 2000)
-      const alive = await cdp.evaluate('!!window.__FBS_ATTACHED__', 2500)
-      if (alive === true) return true
+      const live = await cdp.evaluate('window.__FBS_VERSION__ || null', 2500)
+      if (live && (!expected || String(live) === expected)) return true
     } catch {
     } finally {
       if (cdp) cdp.close()
     }
   }
   return false
+}
+
+/** True when the patched copy is already running with its debug port open. */
+async function isDebugPortLive(port) {
+  try {
+    const list = await fetchTargets(port)
+    return list.some(isFreebuffTarget)
+  } catch {
+    return false
+  }
 }
 
 /** Current ad-hiding preference (default on). */
@@ -602,6 +627,7 @@ module.exports = {
   installBridge,
   attachBridge,
   isAttached,
+  isDebugPortLive,
   stopInjector,
   getHideAds,
   setHideAds,

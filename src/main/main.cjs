@@ -72,7 +72,10 @@ async function openThemed() {
   const exe = fb.detectFreebuff() || (fs.existsSync(patch.PATCHED_EXE) ? patch.PATCHED_EXE : null)
   if (!exe) return { ok: false, error: 'Freebuff was not found. Install it from freebuff.com first.' }
 
-  if (await bridge.isAttached(fb.DEBUG_PORT)) {
+  if (await bridge.isDebugPortLive(fb.DEBUG_PORT)) {
+    // The patched copy is already up; attach (or refresh a stale runtime)
+    // instead of restarting the app under the user.
+    try { await bridge.attachBridge(fb.DEBUG_PORT) } catch {}
     fb.openFreebuff(patch.BUNDLE) // bring the existing window forward
     return { ok: true, note: 'Freebuff is already open.' }
   }
@@ -111,6 +114,12 @@ async function ensureThemed() {
   busy = true
   try {
     if (await bridge.isAttached(fb.DEBUG_PORT)) { plainSince = { key: '', at: 0 }; return }
+    // Copy already running with the debug port: inject the current runtime
+    // into it (covers a stale build) rather than quitting the app.
+    if (await bridge.isDebugPortLive(fb.DEBUG_PORT)) {
+      try { await bridge.attachBridge(fb.DEBUG_PORT) } catch {}
+      return
+    }
     const pids = await fb.freebuffPids()
     if (!pids.length) { plainSince = { key: '', at: 0 }; return }
     const exe = fb.detectFreebuff() || (fs.existsSync(patch.PATCHED_EXE) ? patch.PATCHED_EXE : null)

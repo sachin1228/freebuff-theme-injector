@@ -8,7 +8,7 @@ Desktop app that themes [Freebuff](https://freebuff.com) with community themes �
 - Launches that copy with Chromium's remote debugging port open and injects a small theme runtime into the app's pages over the DevTools Protocol.
 - The runtime applies the active theme's CSS at document-start, themes the launch splash and the window background, and adds a theme + font picker to the bottom of Freebuff's sidebar.
 - Freebuff 0.0.201's main window is the `freebuff.com` web app, not the loopback loading shell. That document keeps unprefixed CSS variables for Tailwind's `hsl(var(--x))` triples and paints its desktop chrome from a `--dk-*` token layer, so the runtime re-declares the theme under `--fbs-t-*` and maps it onto `--dk-*` instead of overwriting the page's own names.
-- It also hides Freebuff's sponsored placements — the "Ad" cards in the chat and above the composer, the large showcase card, the sponsor break and the promo spotlight. This is always on in the patched copy.
+- It also hides Freebuff's sponsored placements — the "Ad" cards in the chat and above the composer, the large showcase card, the sponsor break and the promo spotlight. This is always on in the patched copy. The hiding deliberately avoids `display: none`: Freebuff samples each slot's geometry and computed visibility, and blocks the composer ("Please allow ads on Freebuff") once every slot reads hidden, so the ads are kept laid out at a tiny zoom and near-zero opacity instead.
 - A background watcher keeps the copy "sticky": a Freebuff started without the injector (manual open, auto-start, updater) is closed and the themed copy launched instead. Quitting Freebuff stays quit.
 
 ## Use

@@ -467,6 +467,7 @@ async function tick(state) {
   try {
     list = await fetchTargets(state.port)
   } catch {}
+  if (list) state.lastTargets = list
   if (list) {
     const seen = new Set()
     for (const target of list) {
@@ -544,7 +545,13 @@ async function attachBridge(port) {
     await new Promise((r) => setTimeout(r, 150))
     if (state.stopped) break
   }
-  throw new Error('Freebuff renderer did not accept the theme runtime')
+  // Say what the debug port actually exposed: a silent timeout used to be
+  // indistinguishable from a port that never opened.
+  const pages = (state.lastTargets || []).filter((t) => t && t.type === 'page')
+  const seen = pages.length
+    ? pages.map((t) => (t.title || '(no title)') + ' ' + String(t.url).slice(0, 60)).slice(0, 3).join(', ')
+    : 'no page targets on port ' + port
+  throw new Error('Freebuff renderer did not accept the theme runtime (' + seen + ')')
 }
 
 /** True when a Freebuff launched with the debug port has the runtime live. */

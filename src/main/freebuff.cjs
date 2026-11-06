@@ -72,8 +72,19 @@ async function freebuffPids() {
       })
       .filter(Boolean)
   }
-  const out = await exec('pgrep', ['-x', 'Freebuff'])
-  return out.trim().split('\n').filter(Boolean).map(Number)
+  /* macOS keeps p_comm as the (possibly truncated) executable path, so
+     `pgrep -x Freebuff` matches nothing even while Freebuff runs. That made
+     the injector believe the app was closed, skip the quit, and hand a second
+     launch to the already-running instance — no debug port, no targets, no
+     theme. Read the real path from ps and match the binary name instead. */
+  const out = await exec('ps', ['-Ao', 'pid=,comm='])
+  const pids = []
+  for (const line of out.split('\n')) {
+    const m = /^\s*(\d+)\s+(.+?)\s*$/.exec(line)
+    if (!m) continue
+    if (/(^|\/)Freebuff$/.test(m[2])) pids.push(Number(m[1]))
+  }
+  return pids
 }
 
 /** Is a Freebuff main process running? (any instance) */

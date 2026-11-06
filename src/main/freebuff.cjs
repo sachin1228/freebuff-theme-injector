@@ -134,15 +134,13 @@ function launchFreebuff(exePath, attachFn) {
   return attachFn(DEBUG_PORT)
 }
 
-/** Launch Freebuff normally (no debug port, no injection). */
-function launchPlain(exePath) {
+/** Bring an already-running copy forward without relaunching it. */
+function openFreebuff(bundlePath) {
   const { spawn } = require('node:child_process')
-  const child = spawn(exePath, [], {
-    detached: true,
-    stdio: 'ignore',
-    env: { ...process.env },
-  })
-  child.unref()
+  try {
+    const child = spawn('open', [bundlePath], { detached: true, stdio: 'ignore' })
+    child.unref()
+  } catch {}
 }
 
 module.exports = {
@@ -151,6 +149,6 @@ module.exports = {
   freebuffPids,
   quitFreebuff,
   launchFreebuff,
-  launchPlain,
+  openFreebuff,
   DEBUG_PORT,
 }

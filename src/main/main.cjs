@@ -1,16 +1,13 @@
 /**
  * Theme Injector — main process.
- * One job: keep the theme runtime injected into Freebuff, and flip Freebuff
- * between themed (enable) and plain (disable) launches.
  *
- * Freebuff 0.0.200+ fuses off NODE_OPTIONS and --inspect, so the injection
- * goes through Chromium's remote debugging port into the renderer (see
- * bridge.cjs). While the switch is ON a background watcher keeps themes
- * "sticky": if Freebuff is found running WITHOUT that port — e.g. it was
- * reopened normally, auto-started, or restarted by its own updater — the
- * watcher relaunches it once with themes. Nothing is ever written inside
- * Freebuff.app, so app updates can't break the injection; they only need the
- * one re-attach, which the watcher performs automatically.
+ * One job: keep the patched copy of Freebuff open and themed.
+ *
+ * Freebuff 0.0.201 refuses to start with any remote-debugging switch, and its
+ * fuses disable NODE_OPTIONS / --inspect / ELECTRON_RUN_AS_NODE. patch.cjs
+ * therefore builds a private copy with the launch guard removed and updates
+ * disabled; this process launches only that copy, injects the theme runtime
+ * over the DevTools port (bridge.cjs), and swaps any stock Freebuff for it.
  */
 'use strict'
 
@@ -22,10 +19,6 @@ const bridge = require('./bridge.cjs')
 const fb = require('./freebuff.cjs')
 const patch = require('./patch.cjs')
 
-/* Renamed from "Freebuff Theme Studio" to "Theme Injector". Electron derives
-   userData from the product name, so pin it (dev and packaged must agree) and
-   carry the old toggle state forward — losing it would silently stop keeping
-   Freebuff themed after an update. */
 app.setName('Theme Injector')
 
 const IS_DEV = !app.isPackaged
@@ -34,40 +27,24 @@ const BUNDLED_THEMES = IS_DEV ? path.join(__dirname, '..', '..', 'themes') : pat
 const ICON_PATH = IS_DEV
   ? path.join(__dirname, '..', '..', 'build', 'icon.png')
   : path.join(process.resourcesPath, 'icon.png')
-const SETTINGS_FILE = () => path.join(app.getPath('userData'), 'settings.json')
-
-const LEGACY_APP_NAMES = ['Freebuff Theme Studio', 'freebuff-theme-studio']
-function migrateSettings() {
-  try {
-    const target = SETTINGS_FILE()
-    if (fs.existsSync(target)) return
-    for (const legacy of LEGACY_APP_NAMES) {
-      const from = path.join(app.getPath('appData'), legacy, 'settings.json')
-      if (!fs.existsSync(from)) continue
-      fs.mkdirSync(path.dirname(target), { recursive: true })
-      fs.copyFileSync(from, target)
-      return
-    }
-  } catch {}
-}
 
 const WATCH_INTERVAL_MS = 5000
+/* Boot grace: closing a Freebuff that is still starting up makes its own load
+   chain reject against a destroyed window — Freebuff surfaces that as a
+   "failed to start" dialog. A plain instance is only swapped once the same PID
+   set has been observed running for PLAIN_GRACE_MS. */
+const PLAIN_GRACE_MS = 8000
 
 let win = null
+let tray = null
 let themedExe = null
 let preparing = null
 let prepareError = null
-let tray = null
-let enabled = false
 let busy = false
 let watchTimer = null
+let plainSince = { key: '', at: 0 }
 
-function readSettings() {
-  try { return JSON.parse(fs.readFileSync(SETTINGS_FILE(), 'utf8')) } catch { return { enabled: false } }
-}
-
-/* Freebuff 0.0.201 refuses to start with a debugging port, so themes live in a
-   patched private copy (see patch.cjs). Build it once when the switch is on. */
+/** Build (once) and remember the patched copy of the installed Freebuff. */
 async function ensureThemedExe(exe) {
   if (themedExe && fs.existsSync(themedExe)) return themedExe
   if (!preparing) {
@@ -80,40 +57,63 @@ async function ensureThemedExe(exe) {
   } catch (e) {
     themedExe = null
     prepareError = e && e.message
-    console.error('[theme-injector] could not build the themed Freebuff copy:', prepareError)
+    console.error('[theme-injector] could not build the patched Freebuff copy:', prepareError)
   }
   return themedExe
 }
-function writeSettings(s) {
-  try { fs.writeFileSync(SETTINGS_FILE(), JSON.stringify(s)) } catch {}
-}
 
-/* ---------- the sticky-themes watcher ---------- */
+/* ---------- launching ---------- */
 
 /**
- * Bring Freebuff up themed if it isn't already. Safe to call repeatedly;
- * reentrancy is guarded so a slow relaunch can't stack up.
+ * Open the themed copy. Reuses a running attached copy, otherwise replaces any
+ * stock Freebuff (same profile, same singleton lock) with the patched one.
  */
-/* Boot grace: closing a Freebuff that is still starting up makes its own
-   load chain reject against a destroyed window — Freebuff surfaces that as
-   a "failed to start" dialog. A plain instance is only swapped once the
-   same PID set has been observed running for PLAIN_GRACE_MS. */
-const PLAIN_GRACE_MS = 8000
-let plainSince = { key: '', at: 0 }
+async function openThemed() {
+  const exe = fb.detectFreebuff() || (fs.existsSync(patch.PATCHED_EXE) ? patch.PATCHED_EXE : null)
+  if (!exe) return { ok: false, error: 'Freebuff was not found. Install it from freebuff.com first.' }
 
+  if (await bridge.isAttached(fb.DEBUG_PORT)) {
+    fb.openFreebuff(patch.BUNDLE) // bring the existing window forward
+    return { ok: true, note: 'Freebuff is already open.' }
+  }
+  if (busy) return { ok: false, error: 'Freebuff is restarting — try again in a moment.' }
+
+  busy = true
+  try {
+    const themed = await ensureThemedExe(exe)
+    if (!themed) {
+      return { ok: false, error: 'Could not prepare the patched copy of Freebuff: ' + (prepareError || 'unknown error') }
+    }
+    if (await fb.isFreebuffRunning()) {
+      const done = await fb.quitFreebuff()
+      if (!done) return { ok: false, error: 'Freebuff did not close. Quit it, then try again.' }
+    }
+    try {
+      await fb.launchFreebuff(themed, bridge.attachBridge)
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: 'Could not attach the theme bridge: ' + e.message }
+    }
+  } finally {
+    busy = false
+  }
+}
+
+/* ---------- the sticky themed copy ---------- */
+
+/**
+ * Keep the themed copy as the only Freebuff. Safe to call repeatedly;
+ * reentrancy is guarded so a slow relaunch can't stack up. Quitting Freebuff
+ * is intent to close, so nothing is reopened when no process is running.
+ */
 async function ensureThemed() {
   if (busy) return
   busy = true
   try {
-    if (await bridge.isAttached(fb.DEBUG_PORT)) { plainSince = { key: '', at: 0 }; return } // already themed
-    // Stickiness only applies while Freebuff is actually open: quitting it is
-    // intent to close, and the injector must not reopen it. A plain launch
-    // (manual open, login item, or the app's own updater restarted it) is
-    // closed and relaunched with the bridge; Freebuff gets themed on that
-    // next open instead.
+    if (await bridge.isAttached(fb.DEBUG_PORT)) { plainSince = { key: '', at: 0 }; return }
     const pids = await fb.freebuffPids()
     if (!pids.length) { plainSince = { key: '', at: 0 }; return }
-    const exe = fb.detectFreebuff()
+    const exe = fb.detectFreebuff() || (fs.existsSync(patch.PATCHED_EXE) ? patch.PATCHED_EXE : null)
     if (!exe) return
     const themed = await ensureThemedExe(exe)
     if (!themed) return
@@ -126,8 +126,8 @@ async function ensureThemed() {
     plainSince = { key: '', at: 0 }
     await fb.launchFreebuff(themed, bridge.attachBridge)
   } catch (e) {
-    // Never let a watcher tick crash the app; next tick retries. Log it —
-    // a swallowed failure here is how a stuck-unthemed Freebuff hides.
+    // Never let a watcher tick crash the app; next tick retries. Log it — a
+    // swallowed failure here is how a stuck-unthemed Freebuff hides.
     console.error('[theme-injector] ensureThemed failed:', e && e.message)
   } finally {
     busy = false
@@ -136,9 +136,7 @@ async function ensureThemed() {
 
 function startWatch() {
   stopWatch()
-  watchTimer = setInterval(() => {
-    if (enabled) ensureThemed()
-  }, WATCH_INTERVAL_MS)
+  watchTimer = setInterval(() => { ensureThemed() }, WATCH_INTERVAL_MS)
 }
 function stopWatch() {
   if (watchTimer) clearInterval(watchTimer)
@@ -154,52 +152,11 @@ function registerIpc() {
       exe,
       running: await fb.isFreebuffRunning(),
       themed: await bridge.isAttached(fb.DEBUG_PORT),
-      enabled,
-      hideAds: bridge.getHideAds(),
+      copyReady: fs.existsSync(patch.PATCHED_EXE),
+      busy,
     }
   })
-  ipcMain.handle('app:setAds', async (_event, hide) => {
-    const want = hide === true
-    const ok = await bridge.setHideAds(want)
-    return ok ? { ok: true, hideAds: want } : { ok: false, error: 'Could not save the ad setting.' }
-  })
-  ipcMain.handle('app:enable', async () => {
-    const exe = fb.detectFreebuff() || (fs.existsSync(patch.PATCHED_EXE) ? patch.PATCHED_EXE : null)
-    if (!exe) return { ok: false, error: 'Freebuff was not found. Install it from freebuff.com first.' }
-    enabled = true
-    writeSettings({ enabled: true })
-    startWatch()
-    if (await bridge.isAttached(fb.DEBUG_PORT)) return { ok: true, note: 'Themes are already on.' }
-    const themed = await ensureThemedExe(exe)
-    if (!themed) {
-      return { ok: false, error: 'Could not prepare the themed copy of Freebuff: ' + (prepareError || 'unknown error') }
-    }
-    if (await fb.isFreebuffRunning()) {
-      const done = await fb.quitFreebuff()
-      if (!done) return { ok: false, error: 'Freebuff did not close. Close it manually, then flip the switch again.' }
-    }
-    try {
-      await fb.launchFreebuff(themed, bridge.attachBridge)
-      return { ok: true }
-    } catch (e) {
-      return { ok: false, error: 'Could not attach the theme bridge: ' + e.message }
-    }
-  })
-  ipcMain.handle('app:disable', async () => {
-    const exe = fb.detectFreebuff() || (fs.existsSync(patch.PATCHED_EXE) ? patch.PATCHED_EXE : null)
-    if (!exe) return { ok: false, error: 'Freebuff was not found.' }
-    enabled = false
-    writeSettings({ enabled: false })
-    stopWatch()
-    const wasThemed = await bridge.isAttached(fb.DEBUG_PORT)
-    if (await fb.isFreebuffRunning()) {
-      const done = await fb.quitFreebuff()
-      if (!done) return { ok: false, error: 'Freebuff did not close. Close it manually and try again.' }
-    }
-    if (!wasThemed) return { ok: true, note: 'Themes are off.' }
-    fb.launchPlain(exe)
-    return { ok: true }
-  })
+  ipcMain.handle('app:open', () => openThemed())
 }
 
 /* ---------- window + tray ---------- */
@@ -215,10 +172,10 @@ function showWindow() {
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 660,
-    height: 688,
-    minWidth: 560,
-    minHeight: 560,
+    width: 560,
+    height: 430,
+    minWidth: 480,
+    minHeight: 380,
     title: 'Theme Injector',
     icon: ICON_PATH,
     backgroundColor: '#000000',
@@ -230,10 +187,10 @@ function createWindow() {
     },
   })
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'))
-  // With themes on, closing the window must not stop the watcher: hide
-  // instead. The tray (and Dock) keep the app reachable.
+  // Closing the window must not stop the watcher: hide instead. The tray (and
+  // Dock) keep the app reachable.
   win.on('close', (e) => {
-    if (enabled && !app.isQuitting) {
+    if (!app.isQuitting) {
       e.preventDefault()
       win.hide()
     }
@@ -249,6 +206,7 @@ function createTray() {
     tray = new Tray(small)
     tray.setToolTip('Theme Injector')
     const menu = Menu.buildFromTemplate([
+      { label: 'Open themed Freebuff', click: () => { openThemed() } },
       { label: 'Show Theme Injector', click: showWindow },
       { type: 'separator' },
       {
@@ -274,19 +232,15 @@ if (!gotLock) {
 } else {
   app.on('second-instance', showWindow)
   app.whenReady().then(() => {
-    migrateSettings()
     bridge.installBridge(BRIDGE_SRC, BUNDLED_THEMES)
     registerIpc()
     createWindow()
     createTray()
-    enabled = !!readSettings().enabled
-    if (enabled) {
-      startWatch() // resume stickiness across app restarts
-      // Build/refresh the patched copy in the background so the first switch-on
-      // does not stall on it.
-      const exe = fb.detectFreebuff()
-      if (exe) ensureThemedExe(exe)
-    }
+    startWatch()
+    // Build/refresh the patched copy in the background so the button does not
+    // stall on it the first time.
+    const exe = fb.detectFreebuff()
+    if (exe) ensureThemedExe(exe)
     app.on('activate', () => {
       if (win && win.isDestroyed()) win = null
       if (!win) createWindow()
@@ -295,8 +249,6 @@ if (!gotLock) {
   })
   app.on('before-quit', () => { app.isQuitting = true })
   app.on('window-all-closed', () => {
-    // Keep running (watcher + tray) while themes are on; on macOS the Dock
-    // icon keeps it alive regardless.
-    if (!enabled && process.platform !== 'darwin') app.quit()
+    if (process.platform !== 'darwin') app.quit()
   })
 }
